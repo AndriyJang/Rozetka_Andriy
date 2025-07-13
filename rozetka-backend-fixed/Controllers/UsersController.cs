@@ -15,16 +15,16 @@ namespace RozetkaApi.Controllers
             _context = context;
         }
 
-        [HttpPost("register")]
-        public IActionResult Register([FromBody] User user)
-        {
-            if (string.IsNullOrEmpty(user.Email) || string.IsNullOrEmpty(user.Password))
-                return BadRequest("Invalid input");
+        //[HttpPost("register")]
+        //public IActionResult Register([FromBody] User user)
+        //{
+        //    if (string.IsNullOrEmpty(user.Email) || string.IsNullOrEmpty(user.Password))
+        //        return BadRequest("Invalid input");
 
-            _context.Users.Add(user);
-            _context.SaveChanges();
+        //    _context.Users.Add(user);
+        //    _context.SaveChanges();
 
-            return Ok(user);
-        }
+        //    return Ok(user);
+        //}
     }
 }
