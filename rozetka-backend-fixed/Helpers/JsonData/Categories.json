@@ -1,0 +1,12 @@
+[
+    {
+        "Name": "Піца",
+        "Slug": "pizza",
+        "Image": "https://prontopizza.ua/ternopil/wp-content/uploads/sites/15/2024/06/photo_2024-06-06_13-17-54-170x170.webp"
+    },
+    {
+        "Name": "Салати",
+        "Slug": "salaty",
+        "Image": "https://prontopizza.ua/ternopil/wp-content/uploads/sites/15/2024/06/photo_2024-06-07_15-41-17-170x170.webp"
+    }
+]

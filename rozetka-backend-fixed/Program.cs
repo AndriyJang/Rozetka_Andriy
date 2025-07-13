@@ -6,7 +6,9 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using RozetkaApi.Data;
+using rozetkabackend;
 using rozetkabackend.Entities.Identity;
+using System;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -40,6 +42,10 @@ builder.Services.AddIdentity<UserEntity, RoleEntity>(options =>
             .AddDefaultTokenProviders();
 
 builder.Services.AddControllers();
+
+builder.Services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
+
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -57,4 +63,7 @@ if (app.Environment.IsDevelopment())
 // app.UseHttpsRedirection();
 app.UseAuthorization();
 app.MapControllers();
+
+await app.SeedData();
+
 app.Run();
