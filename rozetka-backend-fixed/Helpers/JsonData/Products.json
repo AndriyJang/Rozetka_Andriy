@@ -1,0 +1,27 @@
+[
+  {
+    "title": "iPhone 13",
+    "category": "Смартфони",
+    "price": 35999
+  },
+  {
+    "title": "Samsung Galaxy S22",
+    "category": "Смартфони",
+    "price": 29999
+  },
+  {
+    "title": "MacBook Air M2",
+    "category": "Ноутбуки",
+    "price": 49999
+  },
+  {
+    "title": "LG OLED 55\"",
+    "category": "Телевізори",
+    "price": 32999
+  },
+  {
+    "title": "Dell XPS 13",
+    "category": "Ноутбуки",
+    "price": 45999
+  }
+]

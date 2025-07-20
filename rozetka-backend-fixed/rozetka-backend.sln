@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.11.35327.3
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "rozetka-backend", "rozetka-backend.csproj", "{712773C5-6347-41E1-9545-5CF10A55E692}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "rozetkabackend", "rozetkabackend.csproj", "{712773C5-6347-41E1-9545-5CF10A55E692}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

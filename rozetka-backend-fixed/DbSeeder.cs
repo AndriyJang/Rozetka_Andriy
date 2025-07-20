@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using RozetkaApi.Data;
+using RozetkaApi.Helpers;
 using rozetkabackend.Constants;
 using rozetkabackend.Entities.Identity;
 using System;
@@ -36,7 +37,7 @@ public static class DbSeeder
                 }
             }
         }
-
+        ProductSeeder.SeedProducts(context);
         /*
         if (!context.Users.Any())
         {
