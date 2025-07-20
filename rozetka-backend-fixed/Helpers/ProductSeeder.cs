@@ -1,10 +1,10 @@
 ﻿using RozetkaApi.Data;
-using RozetkaApi.Models;
 using System.Collections.Generic;
 using System.IO;
 using System;
 using System.Text.Json;
 using System.Linq;
+using rozetkabackend.Data.Entities;
 
 namespace RozetkaApi.Helpers
 {
@@ -15,11 +15,11 @@ namespace RozetkaApi.Helpers
             // Створюємо категорії, якщо їх немає
             if (!context.Categories.Any())
             {
-                var categories = new List<Category>
+                var categories = new List<CategoryEntity>
                 {
-                    new Category { Name = "Смартфони" },
-                    new Category { Name = "Ноутбуки" },
-                    new Category { Name = "Телевізори" }
+                    new CategoryEntity { Name = "Смартфони" },
+                    new CategoryEntity { Name = "Ноутбуки" },
+                    new CategoryEntity { Name = "Телевізори" }
                 };
                 context.Categories.AddRange(categories);
                 context.SaveChanges();
@@ -41,7 +41,7 @@ namespace RozetkaApi.Helpers
                             var category = context.Categories.FirstOrDefault(c => c.Name == item.Category);
                             if (category != null)
                             {
-                                context.Products.Add(new Product
+                                context.Products.Add(new ProductEntity
                                 {
                                     Title = item.Title,
                                     Price = item.Price,

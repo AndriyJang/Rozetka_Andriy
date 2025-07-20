@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
-using RozetkaApi.Models;
+using rozetkabackend.Data.Entities;
 using rozetkabackend.Entities.Identity;
 
 namespace RozetkaApi.Data
@@ -11,8 +11,8 @@ namespace RozetkaApi.Data
         IdentityRoleClaim<long>, IdentityUserToken<long>>
     {
         public AppDbContext(DbContextOptions options) : base(options) {}
-        public DbSet<Category> Categories { get; set; }
-        public DbSet<Product> Products { get; set; }
+        public DbSet<CategoryEntity> Categories { get; set; }
+        public DbSet<ProductEntity> Products { get; set; }
 
 
         //public DbSet<User> Users { get; set; },

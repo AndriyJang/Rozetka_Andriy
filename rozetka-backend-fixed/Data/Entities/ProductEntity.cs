@@ -1,25 +1,27 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace RozetkaApi.Models
+namespace rozetkabackend.Data.Entities
 {
-    public class Product
+    [Table("tblProducts")]
+    public class ProductEntity
     {
+        [Key]
         public int Id { get; set; }
 
-        [Required]
+        [Required, StringLength(255)]
         public string Title { get; set; }
 
         public string Description { get; set; }
 
-        [Required]
+        [Required, StringLength(255)]
         public decimal Price { get; set; }
 
         // Зовнішній ключ до категорії
-        [ForeignKey("Category")]
+        [ForeignKey(nameof(Category))]
         public int CategoryId { get; set; }
 
         // Навігаційна властивість
-        public Category Category { get; set; }
+        public virtual CategoryEntity Category { get; set; }
     }
 }

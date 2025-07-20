@@ -2,10 +2,11 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RozetkaApi.Data;
-using RozetkaApi.Models;
 using System.Threading.Tasks;
 using System;
 using System.Linq;
+using RozetkaApi.Dtos;
+using rozetkabackend.Entities.Identity;
 
 namespace RozetkaApi.Controllers
 {
@@ -14,10 +15,12 @@ namespace RozetkaApi.Controllers
     public class UsersController : ControllerBase
     {
         private readonly AppDbContext _context;
+        private readonly UserManager<UserEntity> _userManager;
 
-        public UsersController(AppDbContext context)
+        public UsersController(AppDbContext context, UserManager<UserEntity> userManager)
         {
             _context = context;
+            _userManager = userManager;
         }
         [HttpPost("reset-by-email")]
         public async Task<IActionResult> ResetByEmail([FromBody] EmailDto dto)
