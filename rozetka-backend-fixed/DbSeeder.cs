@@ -36,7 +36,7 @@ public static class DbSeeder
                 }
             }
         }
-
+        ProductSeeder.SeedProducts(context);
         /*
         if (!context.Users.Any())
         {
