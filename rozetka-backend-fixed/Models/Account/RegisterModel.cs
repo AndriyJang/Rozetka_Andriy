@@ -1,4 +1,6 @@
 ﻿
+using rozetkabackend.Constants;
+
 namespace rozetkabackend.Models.Account;
 
 public class RegisterModel
@@ -26,4 +28,10 @@ public class RegisterModel
     /// </summary>
     /// <example>pass123?</example>
     public string Password { get; set; }
+
+    /// <summary>
+    /// Роль користувача (Admin або User)
+    /// </summary>
+    /// <example>Admin</example>
+    public string Role { get; set; } = Roles.User; // за замовчуванням User
 }
