@@ -1,4 +1,5 @@
-import { TextField, Button, Container, Typography, Stack } from '@mui/material';
+import Layout from "../components/Layout";
+import { TextField, Button, Container, Typography } from '@mui/material';
 import { useState } from 'react';
 
 export default function ResetPassword() {
@@ -56,6 +57,7 @@ export default function ResetPassword() {
   };
 
   return (
+    <Layout>
     <Container sx={{ mt: 5 }} maxWidth="sm">
       <Typography variant="h5" gutterBottom>
         Відновлення паролю
@@ -97,5 +99,6 @@ export default function ResetPassword() {
         Відновити за допомогою телефона
       </Button>
     </Container>
+    </Layout>
   );
 }

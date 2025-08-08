@@ -1,3 +1,4 @@
+import Layout from "../components/Layout";
 import { Button, TextField, Typography, Container } from "@mui/material";
 import { useState } from "react";
 
@@ -48,7 +49,8 @@ try {
   };
 
   return (
-    <Container maxWidth="sm" sx={{ mt: 5 }}>
+    <Layout>
+     <Container maxWidth="sm" sx={{ mt: 5 }}>
       <Typography variant="h5">Реєстрація</Typography>
       <TextField label="Ім'я" name="name" fullWidth margin="normal" onChange={handleChange} />
       <TextField label="Email" name="email" fullWidth margin="normal" onChange={handleChange} />
@@ -67,6 +69,7 @@ try {
       <Button variant="contained" color="primary" onClick={handleSubmit}>
         Зареєструватися
       </Button>
-    </Container>
+    </Container>   
+    </Layout> 
   );
 }
