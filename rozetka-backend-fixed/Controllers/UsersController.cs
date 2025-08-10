@@ -46,7 +46,7 @@ namespace RozetkaApi.Controllers
 
         //    return Ok("Тимчасовий пароль надіслано на email");
         //}
-        [HttpPost("reset-by-phone")]
+        //[HttpPost("reset-by-phone")]
         //public async Task<IActionResult> ResetByPhone([FromBody] PhoneDto dto)
         //{
         //    var user = await _context.Users.FirstOrDefaultAsync(u => u.PhoneNumber == dto.Phone);
