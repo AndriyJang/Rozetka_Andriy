@@ -97,6 +97,6 @@ namespace RozetkaApi.Controllers
         //        .Where(p => p.Title.ToLower().Contains(query.ToLower()) ||
         //                    p.Category.Name.ToLower().Contains(query.ToLower()))
         //        .ToListAsync();
-        //}
+        //} Це Валентин зробив
     }
 }

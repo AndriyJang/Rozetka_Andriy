@@ -1,4 +1,4 @@
-import { TextField, Button, Container, Typography, Stack } from '@mui/material';
+import { TextField, Button, Container, Typography } from '@mui/material';
 import { useState } from 'react';
 
 export default function ResetPassword() {

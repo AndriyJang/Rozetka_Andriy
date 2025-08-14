@@ -1,72 +1,150 @@
-import { Button, TextField, Typography, Container } from "@mui/material";
+import Layout from "../components/Layout";
+import {
+  Button,
+  TextField,
+  Typography,
+  Container,
+  Box,
+  Link,
+} from "@mui/material";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 export default function RegisterUser() {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     name: "",
     email: "",
-    phone: "",
     password: "",
+    confirmPassword: "",
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const validateEmail = (email: string) =>
-    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-  const validatePhone = (phone: string) => /^\d{10,15}$/.test(phone);
-  const validatePassword = (password: string) =>
-    /^[a-z0-9]{6,}$/.test(password);
-
   const handleSubmit = async () => {
-    const { name, email, phone, password } = formData;
-
-    if (!validateEmail(email)) return alert("Невірний email");
-    if (!validatePhone(phone)) return alert("Телефон має 10-15 цифр");
-    if (!validatePassword(password))
-      return alert("Пароль має бути від 6 символів, лише малі англ. літери і цифри");
-
-   const apiUrl = import.meta.env.VITE_API_URL;
-
-try {
-  const response = await fetch(`${apiUrl}/api/Users/register`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(formData),
-  });
-
-  if (response.ok) {
-    alert("Успішна реєстрація");
-  } else {
-    alert("Помилка при реєстрації");
-  }
-} catch (error) {
-  alert("Проблема з сервером");
-  console.error(error);
-}
+    if (formData.password !== formData.confirmPassword) {
+      alert("Паролі не співпадають");
+      return;
+    }
+    alert("Форма відправлена!");
   };
 
   return (
-    <Container maxWidth="sm" sx={{ mt: 5 }}>
-      <Typography variant="h5">Реєстрація</Typography>
-      <TextField label="Ім'я" name="name" fullWidth margin="normal" onChange={handleChange} />
-      <TextField label="Email" name="email" fullWidth margin="normal" onChange={handleChange} />
-      <TextField label="Телефон" name="phone" fullWidth margin="normal" onChange={handleChange} />
-      <Typography variant="body2" color="textSecondary">
-        Пароль має містити лише **малі англійські літери** та **цифри**, мінімум 6 символів
-      </Typography>
-      <TextField
-        label="Пароль"
-        name="password"
-        type="password"
-        fullWidth
-        margin="normal"
-        onChange={handleChange}
-      />
-      <Button variant="contained" color="primary" onClick={handleSubmit}>
-        Зареєструватися
-      </Button>
-    </Container>
+    <Layout>
+      <Container
+        maxWidth="sm"
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          minHeight: "90vh",
+        }}
+      >
+        <Box
+          sx={{
+            backgroundColor: "#fff",
+            p: 4,
+            borderRadius: "10px",
+            boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
+            width: "100%",
+            textAlign: "center",
+          }}
+        >
+          {/* Логотип */}
+          <Box
+            sx={{
+              background: "linear-gradient(180deg, #0D9488 0%, #023854 100%)",
+              color: "#fff",
+              fontWeight: "bold",
+              display: "inline-block",
+              px: 4,
+              py: 1.6,
+              borderRadius: "8px",
+              fontSize: "18px",
+              mb: 2,
+            }}
+          >
+            NUVORA
+          </Box>
+
+          {/* Заголовок */}
+          <Typography
+            variant="h6"
+            sx={{ fontWeight: "bold", mb: 2, color: "#002244" }}
+          >
+            Створити обліковий запис
+          </Typography>
+
+          {/* Поля */}
+          <TextField
+            label="Ім'я *"
+            name="name"
+            value={formData.name}
+            onChange={handleChange}
+            fullWidth
+            margin="normal"
+          />
+          <TextField
+            label="Ел. пошта *"
+            name="email"
+            value={formData.email}
+            onChange={handleChange}
+            placeholder="you@example.com"
+            fullWidth
+            margin="normal"
+          />
+          <TextField
+            label="Пароль *"
+            type="password"
+            name="password"
+            value={formData.password}
+            onChange={handleChange}
+            fullWidth
+            margin="normal"
+          />
+          <TextField
+            label="Підтвердження паролю *"
+            type="password"
+            name="confirmPassword"
+            value={formData.confirmPassword}
+            onChange={handleChange}
+            fullWidth
+            margin="normal"
+          />
+
+          {/* Кнопка */}
+          <Button
+            fullWidth
+            sx={{
+              mt: 3,
+              background: "linear-gradient(to right, #004C99, #007ACC)",
+              color: "#fff",
+              py: 1.5,
+              fontWeight: "bold",
+              borderRadius: "25px",
+              "&:hover": {
+                background: "linear-gradient(to right, #003366, #005A99)",
+              },
+            }}
+            onClick={handleSubmit}
+          >
+            Зареєструватися
+          </Button>
+
+          {/* Посилання */}
+          <Typography variant="body2" sx={{ mt: 2 }}>
+            Є обліковий запис?{" "}
+            <Link
+              sx={{ cursor: "pointer", color: "#007ACC" }}
+              onClick={() => navigate("/login")}
+            >
+              Увійти
+            </Link>
+          </Typography>
+        </Box>
+      </Container>
+    </Layout>
   );
 }

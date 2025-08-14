@@ -38,7 +38,7 @@ public class AccountController(
         var result = await userManager.CreateAsync(user, model.Password);
         if (result.Succeeded)
         {
-            await userManager.AddToRoleAsync(user, model.Role);
+            //await userManager.AddToRoleAsync(user, );
             var token = await jwtTokenService.CreateTokenAsync(user);
             return Ok(new
             {
