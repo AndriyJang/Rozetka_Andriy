@@ -11,7 +11,7 @@ import {
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-const passwordRegex = /^(?=.*\d)(?!\d)[a-z0-9]{6}$/; // 6 символів, малі латинські + цифри, цифра не перша
+//const passwordRegex = /^(?=.*\d)(?!\d)[a-z0-9]{6}$/; // 6 символів, малі латинські + цифри, цифра не перша
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function RegisterUser() {
@@ -34,9 +34,9 @@ export default function RegisterUser() {
     if (!formData.name.trim()) return "Ім'я є обов'язковим.";
     if (!formData.lastName.trim()) return "Прізвище є обов'язковим.";
     if (!emailRegex.test(formData.email)) return "Невірний формат ел. пошти.";
-    if (!passwordRegex.test(formData.password)) {
+    /*if (!passwordRegex.test(formData.password)) {
       return "Пароль має бути рівно 6 символів, лише малі латинські та цифри; цифра не перша.";
-    }
+    }*/
     if (formData.password !== formData.confirmPassword) {
       return "Паролі не співпадають.";
     }
@@ -146,9 +146,9 @@ export default function RegisterUser() {
             onChange={handleChange}
             fullWidth
             margin="normal"
-            error={!!formData.password && !passwordRegex.test(formData.password)}
+            //error={!!formData.password && !passwordRegex.test(formData.password)}
             helperText={
-              !!formData.password && !passwordRegex.test(formData.password)
+              !!formData.password
                 ? "6 символів, малі латинські та цифри; цифра не перша."
                 : " "
             }
