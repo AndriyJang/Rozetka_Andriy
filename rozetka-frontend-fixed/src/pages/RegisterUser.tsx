@@ -6,29 +6,52 @@ import {
   Container,
   Box,
   Link,
+  Alert
 } from "@mui/material";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+
+const passwordRegex = /^(?=.*\d)(?!\d)[a-z0-9]{6}$/; // 6 символів, малі латинські + цифри, цифра не перша
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function RegisterUser() {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     name: "",
+    lastName: "",
     email: "",
     password: "",
     confirmPassword: "",
   });
 
+  const [error, setError] = useState<string | null>(null);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = async () => {
+  const validate = () => {
+    if (!formData.name.trim()) return "Ім'я є обов'язковим.";
+    if (!formData.lastName.trim()) return "Прізвище є обов'язковим.";
+    if (!emailRegex.test(formData.email)) return "Невірний формат ел. пошти.";
+    if (!passwordRegex.test(formData.password)) {
+      return "Пароль має бути рівно 6 символів, лише малі латинські та цифри; цифра не перша.";
+    }
     if (formData.password !== formData.confirmPassword) {
-      alert("Паролі не співпадають");
+      return "Паролі не співпадають.";
+    }
+    return null;
+  };
+
+  const handleSubmit = async () => {
+    setError(null);
+    const err = validate();
+    if (err) {
+      setError(err);
       return;
     }
-    alert("Форма відправлена!");
+
+    alert("Форма відправлена!"); // тут буде запит на бекенд
   };
 
   return (
@@ -77,11 +100,25 @@ export default function RegisterUser() {
             Створити обліковий запис
           </Typography>
 
+          {error && (
+            <Alert severity="error" sx={{ width: "100%", mb: 2 }}>
+              {error}
+            </Alert>
+          )}
+
           {/* Поля */}
           <TextField
             label="Ім'я *"
             name="name"
             value={formData.name}
+            onChange={handleChange}
+            fullWidth
+            margin="normal"
+          />
+          <TextField
+            label="Прізвище *"
+            name="lastName"
+            value={formData.lastName}
             onChange={handleChange}
             fullWidth
             margin="normal"
@@ -94,6 +131,12 @@ export default function RegisterUser() {
             placeholder="you@example.com"
             fullWidth
             margin="normal"
+            error={!!formData.email && !emailRegex.test(formData.email)}
+            helperText={
+              !!formData.email && !emailRegex.test(formData.email)
+                ? "Невірний формат ел. пошти."
+                : " "
+            }
           />
           <TextField
             label="Пароль *"
@@ -103,6 +146,12 @@ export default function RegisterUser() {
             onChange={handleChange}
             fullWidth
             margin="normal"
+            error={!!formData.password && !passwordRegex.test(formData.password)}
+            helperText={
+              !!formData.password && !passwordRegex.test(formData.password)
+                ? "6 символів, малі латинські та цифри; цифра не перша."
+                : " "
+            }
           />
           <TextField
             label="Підтвердження паролю *"
@@ -112,6 +161,16 @@ export default function RegisterUser() {
             onChange={handleChange}
             fullWidth
             margin="normal"
+            error={
+              !!formData.confirmPassword &&
+              formData.confirmPassword !== formData.password
+            }
+            helperText={
+              !!formData.confirmPassword &&
+              formData.confirmPassword !== formData.password
+                ? "Паролі не співпадають."
+                : " "
+            }
           />
 
           {/* Кнопка */}
