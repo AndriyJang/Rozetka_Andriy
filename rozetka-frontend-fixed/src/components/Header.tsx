@@ -31,21 +31,21 @@ export default function Header() {
         {/* Центр: пошук */}
         <Box sx={{ flex: 1, display: "flex", justifyContent: "center", alignItems: "center" }}>
           <InputBase
-            placeholder="Я шукаю..."
-            sx={{
-              backgroundColor: "#EFF3F3",
-              borderRadius: "20px",
-              px: 2,
-              py: 1,
-              width: "100%",
-              maxWidth: 640,
-              fontSize: 16,
-              color: "#023854",
-            }}
-            inputProps={{
+  placeholder="Я шукаю..."
+  sx={{
+    backgroundColor: "#EFF3F3",
+    borderRadius: "20px",
+    px: 2,
+    py: 1,
+    width: "100%",
+    maxWidth: 640,
+    fontSize: 16,
+    color: "#023854",
+  }}
+  inputProps={{
               sx: { textAlign: "center" },
-            }}
-          />
+  }}
+/>
         </Box>
 
         {/* Права частина */}

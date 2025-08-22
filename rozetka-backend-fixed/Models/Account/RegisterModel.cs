@@ -1,4 +1,6 @@
 ﻿
+using rozetkabackend.Constants;
+
 namespace rozetkabackend.Models.Account;
 
 public class RegisterModel
