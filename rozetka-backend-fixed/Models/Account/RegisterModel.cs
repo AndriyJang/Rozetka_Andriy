@@ -9,12 +9,7 @@ public class RegisterModel
     /// <example>name</example>
     public string FirstName { get; set; }
 
-    /// <summary>
-    /// Прізвище користувача
-    /// </summary>
-    /// <example>surname</example>
-    public string LastName { get; set; }
-
+    
     /// <summary>
     /// Електронна пошта користувача
     /// </summary>

@@ -1,3 +1,4 @@
+// src/pages/Login.tsx
 import Layout from "../components/Layout";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
@@ -5,10 +6,28 @@ import {
   Box, Button, TextField, Typography, Link,
   Alert, CircularProgress
 } from "@mui/material";
+import { useGoogleLogin } from '@react-oauth/google';
 
-const LOGIN_ENDPOINT = "/api/Account/Login"; // ← з бекенду
-const passwordRegex = /^(?=.*\d)(?!\d)[a-z0-9]{8}$/; // 6 символів, малі латинські + цифри, цифра не перша
+const LOGIN_ENDPOINT = "/api/Account/Login"; // ← бекенд
+const passwordRegex = /^(?=.*\d)(?!\d)[a-z0-9]{8}$/; // 8 символів, малі латинські + цифри, цифра не перша
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Примітивний декодер JWT (без залежностей)
+function decodeJwt<T = any>(token: string): T | null {
+  try {
+    const [, payload] = token.split(".");
+    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const json = decodeURIComponent(
+      atob(base64)
+        .split("")
+        .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+        .join("")
+    );
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
 
 export default function Login() {
   const navigate = useNavigate();
@@ -19,10 +38,13 @@ export default function Login() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const loginbygoogle = useGoogleLogin({
+  onSuccess: tokenResponse => console.log(tokenResponse),
+});
   const validate = () => {
     if (!emailRegex.test(email)) return "Невірний формат ел. пошти.";
     if (!passwordRegex.test(password)) {
-      return "Пароль має бути рівно 6 символів, лише малі латинські та цифри; цифра не перша.";
+      return "Пароль має бути рівно 8 символів, лише малі латинські та цифри; цифра не перша.";
     }
     return null;
   };
@@ -55,11 +77,32 @@ export default function Login() {
       }
 
       const data = await res.json();
-      // Бекенд повертає { Token: "<jwt>" }
-      const token = data?.Token;
-      if (token) localStorage.setItem("token", token);
+      // Бек може повернути { Token: "..."} або { token: "..." }
+      const token: string | undefined = data?.Token ?? data?.token;
+      if (!token) {
+        setError("Сервер не повернув токен.");
+        return;
+      }
 
-      navigate("/product-search");
+      localStorage.setItem("token", token);
+
+      // ✓ Декодуємо токен, дістаємо ролі
+      const payload = decodeJwt<{ roles?: string | string[]; role?: string | string[] }>(token);
+      const raw =
+        (Array.isArray(payload?.roles) ? payload?.roles : payload?.roles ? [payload?.roles] : []) as string[];
+      const raw2 =
+        (Array.isArray(payload?.role) ? payload?.role : payload?.role ? [payload?.role] : []) as string[];
+      const roles = [...raw, ...raw2].map(r => String(r));
+
+      // збережемо роли (може стати у пригоді в UI)
+      if (roles.length) localStorage.setItem("roles", JSON.stringify(roles));
+
+      // Редірект за роллю
+      if (roles.includes("Admin")) {
+        navigate("/admin");
+      } else {
+        navigate("/product-search");
+      }
     } catch (e: any) {
       setError(e?.message ?? "Не вдалося увійти.");
     } finally {
@@ -126,7 +169,7 @@ export default function Login() {
             error={!!password && !passwordRegex.test(password)}
             helperText={
               !!password && !passwordRegex.test(password)
-                ? "6 символів, малі латинські та цифри; цифра не перша."
+                ? "8 символів, малі латинські та цифри; цифра не перша."
                 : " "
             }
           />
@@ -154,7 +197,16 @@ export default function Login() {
         >
           {submitting ? <CircularProgress size={22} sx={{ color: "white" }} /> : "Увійти"}
         </Button>
-
+        {/* <Button
+            fullWidth
+            variant="outlined"
+            sx={{ mt: 2, borderRadius: 999 }}
+            component="a"
+            href={`${import.meta.env.VITE_API_URL}/api/Account/ExternalLogin/google`} 
+            >
+            Увійти через Google
+        </Button> */}
+        <Button onClick={() => loginbygoogle()}>Sign in with Google 🚀</Button>
         <Typography sx={{ mt: 3, fontSize: 14 }}>
           Ще не маєте облікового запису?{" "}
           <Link

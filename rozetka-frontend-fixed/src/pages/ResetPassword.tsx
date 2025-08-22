@@ -3,17 +3,10 @@ import Layout from "../components/Layout";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import {
-  Box,
-  Button,
-  TextField,
-  Typography,
-  Alert,
-  CircularProgress,
-  Link,
+  Box, Button, TextField, Typography, Alert, CircularProgress, Link,
 } from "@mui/material";
 
-const EMAIL_ENDPOINT = "/api/Users/reset-by-email";
-const PHONE_ENDPOINT = "/api/Users/reset-by-phone";
+const REQUEST_ENDPOINT = "/api/Users/request-reset";
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const phoneRegex = /^\+?\d{10,15}$/; // +XXXXXXXXXX… (10–15 цифр)
@@ -33,31 +26,23 @@ export default function ResetPassword() {
 
     const isEmail = emailRegex.test(identifier);
     const isPhone = phoneRegex.test(identifier);
-
     if (!isEmail && !isPhone) {
       setError("Введіть коректний email або номер телефону у форматі +380XXXXXXXXX.");
       return;
     }
 
-    const endpoint = isEmail ? EMAIL_ENDPOINT : PHONE_ENDPOINT;
     const payload = isEmail ? { email: identifier } : { phone: identifier };
 
     try {
       setSubmitting(true);
-
-      const res = await fetch(`${apiUrl}${endpoint}`, {
+      const res = await fetch(`${apiUrl}${REQUEST_ENDPOINT}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
-        // 404 з твого бекенду = користувача не знайдено
-        if (res.status === 404) {
-          setError(isEmail ? "Користувача з таким email не знайдено." : "Користувача з таким телефоном не знайдено.");
-          return;
-        }
-        let msg = "Не вдалося надіслати інструкції. Спробуйте ще раз.";
+        let msg = "Не вдалося надіслати код. Спробуйте ще раз.";
         try {
           const d = await res.json();
           if (d?.message) msg = d.message;
@@ -65,16 +50,13 @@ export default function ResetPassword() {
         throw new Error(msg);
       }
 
-      // бекенд повертає текстове повідомлення
-      let textMsg = "";
-      try {
-        textMsg = await res.text();
-      } catch {}
-      setSuccess(
-        textMsg ||
-          "Якщо такий обліковий запис існує, інструкції/тимчасовий пароль надіслано."
-      );
-      setIdentifier("");
+      setSuccess("Якщо такий обліковий запис існує, ми надіслали код підтвердження.");
+      // ✅ Зберігаємо у localStorage, щоб NewPassword.tsx знав, кому міняти пароль
+      localStorage.setItem("reset_identifier", identifier);
+      // переходимо на сторінку введення коду й нового пароля, передаємо identifier
+      setTimeout(() => {
+        navigate("/new-password", { state: { identifier } });
+      }, 600);
     } catch (e: any) {
       setError(e?.message ?? "Сталася помилка. Спробуйте пізніше.");
     } finally {
@@ -82,79 +64,55 @@ export default function ResetPassword() {
     }
   };
 
-  const backToLogin = () => navigate("/login");
-
   return (
     <Layout>
-      <Box
-        sx={{
-          width: 484,
-          bgcolor: "#fff",
-          mx: "auto",
-          borderRadius: 3,
-          boxShadow: 3,
-          px: 4,
-          py: 4,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-        }}
-      >
-        {/* NUVORA pill */}
-        <Box
-          sx={{
-            background: "linear-gradient(180deg, #0D9488 0%, #023854 100%)",
-            borderRadius: "10px",
-            px: 6,
-            py: 1.25,
-            boxShadow: 2,
-            mb: 2.5,
-            color: "#fff",
-            fontWeight: "bold",
-            fontSize: 20,
-          }}
-        >
+      <Box sx={{
+        width: 484, bgcolor: "#fff", mx: "auto", borderRadius: 5,
+        boxShadow: "0 12px 30px rgba(2,56,84,0.10)", px: 5, py: 5,
+        display: "flex", flexDirection: "column", alignItems: "center",
+      }}>
+        <Box sx={{
+          background: "linear-gradient(180deg, #0D9488 0%, #023854 100%)",
+          borderRadius: "12px", px: 7, py: 1.4, color: "#fff", fontWeight: 700,
+          fontSize: 20, letterSpacing: 0.4, mb: 3, boxShadow: "0 6px 0 rgba(2,56,84,0.18)",
+        }}>
           NUVORA
         </Box>
 
-        <Typography
-          variant="h6"
-          sx={{ fontWeight: "bold", color: "#1E293B", mb: 2, textAlign: "center" }}
-        >
+        <Typography sx={{ fontWeight: 800, color: "#0F172A", fontSize: 22, lineHeight: 1.2, mb: 2, textAlign: "center" }}>
           Відновлення облікового запису
         </Typography>
 
-        <Typography
-          variant="body2"
-          sx={{ color: "text.secondary", textAlign: "center", mb: 2.5 }}
-        >
-          Введіть вашу електронну адресу або номер телефону, і ми
-          надішлемо вам інструкції з відновлення паролю.
+        <Typography variant="body2" sx={{ color: "#6B7280", textAlign: "center", mb: 3, maxWidth: 420 }}>
+          Введіть вашу електронну адресу або номер телефону, і ми надішлемо вам код підтвердження.
         </Typography>
 
-        {error && (
-          <Alert severity="error" sx={{ width: "100%", mb: 2 }}>
-            {error}
-          </Alert>
-        )}
-        {success && (
-          <Alert severity="success" sx={{ width: "100%", mb: 2 }}>
-            {success}
-          </Alert>
-        )}
+        {error && <Alert severity="error" sx={{ width: "100%", mb: 2 }}>{error}</Alert>}
+        {success && <Alert severity="success" sx={{ width: "100%", mb: 2 }}>{success}</Alert>}
 
         <Box sx={{ width: "100%" }}>
-          <Typography sx={{ fontSize: 14, mb: 0.5 }}>
+          <Typography sx={{ fontSize: 14, mb: 0.75, color: "#111827" }}>
             Ел. пошта або номер телефону <span style={{ color: "#EF4444" }}>*</span>
           </Typography>
           <TextField
             fullWidth
-            size="small"
             placeholder="your@email.com / +380XXXXXXXXX"
             value={identifier}
             onChange={(e) => setIdentifier(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-            sx={{ mb: 3, borderRadius: "10px" }}
+            variant="outlined"
+            sx={{
+              mb: 3,
+              "& .MuiOutlinedInput-root": {
+                height: 44,
+                borderRadius: "12px",
+                backgroundColor: "#F4F7F7",
+                "& fieldset": { borderColor: "#E5E7EB" },
+                "&:hover fieldset": { borderColor: "#D1D5DB" },
+                "&.Mui-focused fieldset": { borderColor: "#0D9488" },
+                "& input::placeholder": { color: "#9CA3AF", opacity: 1 },
+              },
+            }}
           />
         </Box>
 
@@ -164,28 +122,16 @@ export default function ResetPassword() {
           onClick={handleSubmit}
           disabled={submitting}
           sx={{
-            py: 1.25,
-            fontWeight: "bold",
-            textTransform: "none",
-            borderRadius: "999px",
+            py: 1.3, fontWeight: 700, textTransform: "none", borderRadius: "999px", fontSize: 16,
             background: "linear-gradient(90deg, #0D9488 0%, #023854 100%)",
-            boxShadow: 4,
-            mb: 1.5,
+            boxShadow: "0 8px 18px rgba(2,56,84,0.22)", mb: 1.75,
+            "&:hover": { boxShadow: "0 10px 20px rgba(2,56,84,0.26)" },
           }}
         >
-          {submitting ? (
-            <CircularProgress size={22} sx={{ color: "white" }} />
-          ) : (
-            "Надіслати"
-          )}
+          {submitting ? <CircularProgress size={22} sx={{ color: "white" }} /> : "Надіслати"}
         </Button>
 
-        <Link
-          component="button"
-          underline="none"
-          onClick={backToLogin}
-          sx={{ color: "#0D9488", fontSize: 14 }}
-        >
+        <Link component="button" underline="none" onClick={() => navigate("/login")} sx={{ color: "#0D9488", fontSize: 14 }}>
           Повернутися до входу
         </Link>
       </Box>

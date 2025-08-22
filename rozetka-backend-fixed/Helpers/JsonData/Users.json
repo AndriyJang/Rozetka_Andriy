@@ -2,25 +2,22 @@
     {
         "Email": "admin@example.com",
         "FirstName": "Адмiн",
-        "LastName": "Системний",
         "Image": "https://thispersondoesnotexist.com",
-        "Password": "Admin123!",
+        "Password": "admin123",
         "Roles": [ "Admin" ]
     },
     {
         "Email": "ivan@example.com",
-        "FirstName": "Іван",
-        "LastName": "Борисюк",
+        "FirstName": "Іван",        
         "Image": "https://thispersondoesnotexist.com",
         "Password": "bb123456",
         "Roles": [ "User" ]
     },
     {
         "Email": "olena@example.com",
-        "FirstName": "Олена",
-        "LastName": "Шаглінська",
+        "FirstName": "Олена",        
         "Image": "https://thispersondoesnotexist.com",
-        "Password": "password",
+        "Password": "pasword1",
         "Roles": [ "User" ]
     }
 ]

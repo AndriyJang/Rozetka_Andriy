@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Threading.Tasks;
+using System.Security.Claims;
 
 namespace rozetkabackend.Services;
 
@@ -19,34 +20,30 @@ public class JwtTokenService(IConfiguration configuration,
         var key = configuration["Jwt:Key"];
 
         var claims = new List<Claim>
+    {
+        new Claim(JwtRegisteredClaimNames.Email, user.Email ?? ""),
+        new Claim(ClaimTypes.Name, user.FirstName ?? user.Email ?? "")
+    };
+
+        var roles = await userManager.GetRolesAsync(user);
+        foreach (var role in roles)
         {
-            new Claim("email", user.Email),
-            new Claim("name", $"{user.LastName} {user.FirstName}")
-        };
-        foreach (var role in await userManager.GetRolesAsync(user))
-        {
+            // головне — стандартний тип ClaimTypes.Role
+            claims.Add(new Claim(ClaimTypes.Role, role));
+
+            // (необов'язково) лишіть дубль для фронта, якщо хочете
             claims.Add(new Claim("roles", role));
         }
 
-        //ключ для підпису токена - перетворив у байти
         var keyBytes = System.Text.Encoding.UTF8.GetBytes(key);
+        var signingKey = new SymmetricSecurityKey(keyBytes);
+        var creds = new SigningCredentials(signingKey, SecurityAlgorithms.HmacSha256);
 
-        //створюємо об'єкт для підпису токена
-        var symmetricSecurityKey = new SymmetricSecurityKey(keyBytes);
+        var jwt = new JwtSecurityToken(
+            claims: claims,
+            expires: DateTime.UtcNow.AddDays(7),
+            signingCredentials: creds);
 
-        //вказуємо ключ і алгоритм підпису токена
-        var signingCredentials = new SigningCredentials(
-            symmetricSecurityKey,
-            SecurityAlgorithms.HmacSha256);
-
-        //створюємо токен
-        var jwtSecurityToken = new JwtSecurityToken(
-            claims: claims, //список параметрів у токені, які є доступні
-            expires: DateTime.UtcNow.AddDays(7), // термін дії токена - після цього часу токен буде недійсний
-            signingCredentials: signingCredentials);
-
-        string token = new JwtSecurityTokenHandler().WriteToken(jwtSecurityToken);
-
-        return token;
+        return new JwtSecurityTokenHandler().WriteToken(jwt);
     }
 }
