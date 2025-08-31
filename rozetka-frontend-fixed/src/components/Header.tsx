@@ -1,7 +1,10 @@
 import { AppBar, Toolbar, Typography, Button, InputBase, Box, IconButton } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
+import { useNavigate } from "react-router-dom";
 
 export default function Header() {
+  const navigate = useNavigate();
+
   return (
     <AppBar position="static" sx={{ backgroundColor: "#FFFFFF", boxShadow: 1 }}>
       <Toolbar sx={{ px: 3, minHeight: 80 }}>
@@ -17,7 +20,7 @@ export default function Header() {
                 fontFamily: "Montserrat",
                 fontWeight: "bold",
                 fontSize: 32,
-                color: "#023854"
+                color: "#023854",
               }}
             >
               NUVORA
@@ -40,9 +43,7 @@ export default function Header() {
     color: "#023854",
   }}
   inputProps={{
-    sx: {
-      textAlign: "center" //  Центрування ПЛЕЙСХОЛДЕРА і введеного тексту
-    }
+              sx: { textAlign: "center" },
   }}
 />
         </Box>
@@ -59,8 +60,9 @@ export default function Header() {
                 textTransform: "none",
                 px: 4,
                 boxShadow: 2,
-                fontSize: 14
+                fontSize: 14,
               }}
+              onClick={() => navigate("/login")}
             >
               Вхід
             </Button>

@@ -1,6 +1,7 @@
 import { Box, Typography, Link, TextField, IconButton } from "@mui/material";
 import { Facebook, Instagram, YouTube } from "@mui/icons-material";
 import CheckIcon from "@mui/icons-material/Check";
+import GoogleIcon from "@mui/icons-material/Google"; 
 
 export default function Footer() {
   return (
@@ -81,7 +82,7 @@ export default function Footer() {
             <IconButton sx={{ color: "#fff" }}><Facebook /></IconButton>
             <IconButton sx={{ color: "#fff" }}><Instagram /></IconButton>
             <IconButton sx={{ color: "#fff" }}><YouTube /></IconButton>
-            
+            <IconButton sx={{ color: "#fff" }}><GoogleIcon /></IconButton>
           </Box>
         </Box>
       </Box>
