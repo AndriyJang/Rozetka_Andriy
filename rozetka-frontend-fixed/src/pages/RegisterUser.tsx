@@ -1,5 +1,5 @@
 import Layout from "../components/Layout";
-import { Button, TextField, Typography, Container, Alert } from "@mui/material";
+import {Button, TextField, Typography, Container, Alert, Box, Link} from "@mui/material";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -13,25 +13,41 @@ export default function RegisterUser() {
   const navigate = useNavigate();
   const apiUrl = import.meta.env.VITE_API_URL;
 
-  const [form, setForm] = useState({
-    FirstName: "",
-    Email: "",
-    Password: "",
+  const [formData, setFormData] = useState({
+    name: "",
+    lastName: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
   });
+
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [okMsg, setOkMsg] = useState<string | null>(null);
 
-  const onChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setForm((s) => ({ ...s, [name]: value }));
+    setFormData((s) => ({ ...s, [name]: value }));
   };
 
+  // const validate = () => {
+  //   if (!form.FirstName.trim()) return "Вкажіть ім'я.";
+  //   if (!emailRegex.test(form.Email)) return "Невірний email.";
+  //   if (!passwordRegex.test(form.Password)) {
+  //     return "Пароль: 8 символів, малі латиниця та цифри; цифра не перша (приклад: a1bcdefg).";
+  //   }
+  //   return null;
+  // };
+
   const validate = () => {
-    if (!form.FirstName.trim()) return "Вкажіть ім'я.";
-    if (!emailRegex.test(form.Email)) return "Невірний email.";
-    if (!passwordRegex.test(form.Password)) {
-      return "Пароль: 8 символів, малі латиниця та цифри; цифра не перша (приклад: a1bcdefg).";
+    if (!formData.name.trim()) return "Ім'я є обов'язковим.";
+    if (!formData.lastName.trim()) return "Прізвище є обов'язковим.";
+    if (!emailRegex.test(formData.email)) return "Невірний формат ел. пошти.";
+    /*if (!passwordRegex.test(formData.password)) {
+      return "Пароль має бути рівно 6 символів, лише малі латинські та цифри; цифра не перша.";
+    }*/
+    if (formData.password !== formData.confirmPassword) {
+      return "Паролі не співпадають.";
     }
     return null;
   };
@@ -47,9 +63,10 @@ export default function RegisterUser() {
 
       // Бекенд чекає FromForm → FormData (без заголовка Content-Type)
       const fd = new FormData();
-      fd.append("FirstName", form.FirstName);
-      fd.append("Email", form.Email);
-      fd.append("Password", form.Password);
+      fd.append("FirstName", formData.name);
+      fd.append("LastName", formData.lastName);
+      fd.append("Email", formData.email);
+      fd.append("Password", formData.password);
 
       const res = await fetch(`${apiUrl}${REGISTER_ENDPOINT}`, {
         method: "POST",
@@ -81,69 +98,155 @@ export default function RegisterUser() {
   };
 
   return (
-    <Layout>
-      <Container maxWidth="sm" sx={{ mt: 5 }}>
-        <Typography variant="h5" sx={{ mb: 2 }}>Реєстрація</Typography>
-
-        {error && <Alert severity="error" sx={{ mb: 2, whiteSpace: "pre-line" }}>{error}</Alert>}
-        {okMsg && <Alert severity="success" sx={{ mb: 2 }}>{okMsg}</Alert>}
-
-        <TextField
-          label="Ім'я"
-          name="FirstName"
-          fullWidth
-          margin="normal"
-          value={form.FirstName}
-          onChange={onChange}
-        />
-        <TextField
-          label="Email"
-          name="Email"
-          fullWidth
-          margin="normal"
-          value={form.Email}
-          onChange={onChange}
-          error={!!form.Email && !emailRegex.test(form.Email)}
-          helperText={!!form.Email && !emailRegex.test(form.Email) ? "Невірний email." : " "}
-        />
-        <Typography variant="body2" color="textSecondary">
-          Пароль має містити лише малі англійські літери та цифри, <b>рівно 8 символів</b>, цифра не перша (напр., <code>a1bcdefg</code>).
-        </Typography>
-        <TextField
-          label="Пароль"
-          name="Password"
-          type="password"
-          fullWidth
-          margin="normal"
-          value={form.Password}
-          onChange={onChange}
-          error={!!form.Password && !passwordRegex.test(form.Password)}
-          helperText={
-            !!form.Password && !passwordRegex.test(form.Password)
-              ? "8 символів, малі літери та цифри; цифра не перша."
-              : " "
-          }
-          onKeyDown={(e) => e.key === "Enter" && !submitting && handleSubmit()}
-        />
-
-        <Button
-          variant="contained"
-          onClick={handleSubmit}
-          disabled={submitting}
-          sx={{
-            mt: 1.5,
-            textTransform: "none",
-            fontWeight: 700,
-            borderRadius: "999px",
-            px: 3,
-            py: 1.2,
-            background: "linear-gradient(90deg, #023854 0%, #035B94 100%)",
-            boxShadow: 4,
-          }}
+      <Layout>
+        <Container
+            maxWidth="sm"
+            sx={{
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              minHeight: "90vh",
+            }}
         >
-          {submitting ? "Надсилаю..." : "Зареєструватися"}
-        </Button>
-      </Container>
-    </Layout>
+          <Box
+              sx={{
+                backgroundColor: "#fff",
+                p: 4,
+                borderRadius: "10px",
+                boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
+                width: "100%",
+                textAlign: "center",
+              }}
+          >
+            {/* Логотип */}
+            <Box
+                sx={{
+                  background: "linear-gradient(180deg, #0D9488 0%, #023854 100%)",
+                  color: "#fff",
+                  fontWeight: "bold",
+                  display: "inline-block",
+                  px: 4,
+                  py: 1.6,
+                  borderRadius: "8px",
+                  fontSize: "18px",
+                  mb: 2,
+                }}
+            >
+              NUVORA
+            </Box>
+
+            {/* Заголовок */}
+            <Typography
+                variant="h6"
+                sx={{ fontWeight: "bold", mb: 2, color: "#002244" }}
+            >
+              Створити обліковий запис
+            </Typography>
+
+            {error && (
+                <Alert severity="error" sx={{ width: "100%", mb: 2 }}>
+                  {error}
+                </Alert>
+            )}
+
+            {/* Поля */}
+            <TextField
+                label="Ім'я *"
+                name="name"
+                value={formData.name}
+                onChange={handleChange}
+                fullWidth
+                margin="normal"
+            />
+            <TextField
+                label="Прізвище *"
+                name="lastName"
+                value={formData.lastName}
+                onChange={handleChange}
+                fullWidth
+                margin="normal"
+            />
+            <TextField
+                label="Ел. пошта *"
+                name="email"
+                value={formData.email}
+                onChange={handleChange}
+                placeholder="you@example.com"
+                fullWidth
+                margin="normal"
+                error={!!formData.email && !emailRegex.test(formData.email)}
+                helperText={
+                  !!formData.email && !emailRegex.test(formData.email)
+                      ? "Невірний формат ел. пошти."
+                      : " "
+                }
+            />
+            <TextField
+                label="Пароль *"
+                type="password"
+                name="password"
+                value={formData.password}
+                onChange={handleChange}
+                fullWidth
+                margin="normal"
+                //error={!!formData.password && !passwordRegex.test(formData.password)}
+                helperText={
+                  !!formData.password
+                      ? "6 символів, малі латинські та цифри; цифра не перша."
+                      : " "
+                }
+            />
+            <TextField
+                label="Підтвердження паролю *"
+                type="password"
+                name="confirmPassword"
+                value={formData.confirmPassword}
+                onChange={handleChange}
+                fullWidth
+                margin="normal"
+                error={
+                    !!formData.confirmPassword &&
+                    formData.confirmPassword !== formData.password
+                }
+                helperText={
+                  !!formData.confirmPassword &&
+                  formData.confirmPassword !== formData.password
+                      ? "Паролі не співпадають."
+                      : " "
+                }
+            />
+
+            {/* Кнопка */}
+            <Button
+                fullWidth
+                sx={{
+                  mt: 3,
+                  background: "linear-gradient(to right, #004C99, #007ACC)",
+                  color: "#fff",
+                  py: 1.5,
+                  fontWeight: "bold",
+                  borderRadius: "25px",
+                  "&:hover": {
+                    background: "linear-gradient(to right, #003366, #005A99)",
+                  },
+                }}
+                onClick={handleSubmit}
+            >
+              Зареєструватися
+            </Button>
+
+            {/* Посилання */}
+            <Typography variant="body2" sx={{ mt: 2 }}>
+              Є обліковий запис?{" "}
+              <Link
+                  sx={{ cursor: "pointer", color: "#007ACC" }}
+                  onClick={() => navigate("/login")}
+              >
+                Увійти
+              </Link>
+            </Typography>
+          </Box>
+        </Container>
+      </Layout>
   );
 }
