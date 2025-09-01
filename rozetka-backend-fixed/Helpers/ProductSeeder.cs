@@ -1,10 +1,12 @@
-﻿using RozetkaApi.Data;
+﻿using AutoMapper;
+using RozetkaApi.Data;
+using rozetkabackend.Data.Entities;
+using rozetkabackend.Data.Entities.Catalog;
+using System;
 using System.Collections.Generic;
 using System.IO;
-using System;
-using System.Text.Json;
 using System.Linq;
-using rozetkabackend.Data.Entities;
+using System.Text.Json;
 
 namespace RozetkaApi.Helpers
 {
@@ -12,18 +14,7 @@ namespace RozetkaApi.Helpers
     {
         public static void SeedProducts(AppDbContext context)
         {
-            // Створюємо категорії, якщо їх немає
-            //if (!context.Categories.Any())
-            //{
-            //    var categories = new List<CategoryEntity>
-            //    {
-            //        new CategoryEntity { Name = "Смартфони" },
-            //        new CategoryEntity { Name = "Ноутбуки" },
-            //        new CategoryEntity { Name = "Телевізори" }
-            //    };
-            //    context.Categories.AddRange(categories);
-            //    context.SaveChanges();
-            //}
+           
 
             //if (!context.Products.Any())
             //{

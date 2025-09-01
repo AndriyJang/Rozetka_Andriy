@@ -1,17 +1,12 @@
-  [
-    {
-      "Name": "Смартфони"
-    },
-    {
-      "Name": "Ноутбуки"
-    },
-    {
-      "Name": "Телевізори"
-    },
-    {
-      "Name": "Планшети"
-    },
-    {
-      "Name": "Навушники"
-    }
-  ]
+[
+  {
+    "Name": "Ноутбуки",
+    "Slug": "notebooks",
+    "Image": "https://video.rozetka.com.ua/img_superportal/kompyutery_i_noutbuki/noutbuki.png"
+  },
+  {
+    "Name": "Монітори",
+    "Slug": "monitors",
+    "Image": "https://video.rozetka.com.ua/img_superportal/kompyutery_i_noutbuki/monitory.png"
+  }
+]

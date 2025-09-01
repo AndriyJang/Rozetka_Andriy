@@ -1,12 +1,16 @@
-﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
+﻿using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.Google;    // ← для GoogleDefaults
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
 using Microsoft.OpenApi.Models;
 using RozetkaApi.Data;
 using rozetkabackend;
@@ -14,11 +18,9 @@ using rozetkabackend.Entities.Identity;
 using rozetkabackend.Interfaces;
 using rozetkabackend.Services;
 using System;
-using System.Text;
-using Microsoft.OpenApi.Models;
+using System.IO;
 using System.Security.Claims;
-using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.Authentication.Google;    // ← для GoogleDefaults
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -78,6 +80,7 @@ builder.Services.AddAuthentication(options =>
 
 
 builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
+builder.Services.AddScoped<IImageService, ImageService>();
 
 builder.Services.AddControllers();
 
@@ -128,6 +131,16 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+
+var dir = builder.Configuration["ImagesDir"];
+string path = Path.Combine(Directory.GetCurrentDirectory(), dir);
+Directory.CreateDirectory(path);
+
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(path),
+    RequestPath = $"/{dir}"
+});
 
 await app.SeedData();
 
