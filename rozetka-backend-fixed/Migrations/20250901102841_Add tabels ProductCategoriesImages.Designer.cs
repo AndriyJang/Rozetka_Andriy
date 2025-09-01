@@ -12,8 +12,8 @@ using RozetkaApi.Data;
 namespace rozetkabackend.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20250720183441_Category and product")]
-    partial class Categoryandproduct
+    [Migration("20250901102841_Add tabels ProductCategoriesImages")]
+    partial class AddtabelsProductCategoriesImages
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -92,7 +92,7 @@ namespace rozetkabackend.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
-            modelBuilder.Entity("rozetkabackend.Data.Entities.CategoryEntity", b =>
+            modelBuilder.Entity("RozetkaApi.Data.Entities.PasswordResetToken", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -100,44 +100,126 @@ namespace rozetkabackend.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("Code")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("UsedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("tblPasswordResetTokens");
+                });
+
+            modelBuilder.Entity("rozetkabackend.Data.Entities.Catalog.CategoryEntity", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("DateCreated")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Image")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)");
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)");
+
+                    b.Property<string>("Slug")
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)");
 
                     b.HasKey("Id");
 
                     b.ToTable("tblCategories");
                 });
 
-            modelBuilder.Entity("rozetkabackend.Data.Entities.ProductEntity", b =>
+            modelBuilder.Entity("rozetkabackend.Data.Entities.Catalog.ProductEntity", b =>
                 {
-                    b.Property<int>("Id")
+                    b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
+                        .HasColumnType("bigint");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
-                    b.Property<int>("CategoryId")
-                        .HasColumnType("integer");
+                    b.Property<long>("CategoryId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("DateCreated")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
-                        .HasColumnType("text");
+                        .HasMaxLength(10000)
+                        .HasColumnType("character varying(10000)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)");
 
                     b.Property<decimal>("Price")
-                        .HasMaxLength(255)
                         .HasColumnType("numeric");
 
-                    b.Property<string>("Title")
+                    b.Property<string>("Slug")
                         .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)");
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)");
 
                     b.HasKey("Id");
 
                     b.HasIndex("CategoryId");
 
                     b.ToTable("tblProducts");
+                });
+
+            modelBuilder.Entity("rozetkabackend.Data.Entities.Catalog.ProductImageEntity", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("DateCreated")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)");
+
+                    b.Property<short>("Priority")
+                        .HasColumnType("smallint");
+
+                    b.Property<long>("ProductId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId");
+
+                    b.ToTable("tblProductImages");
                 });
 
             modelBuilder.Entity("rozetkabackend.Entities.Identity.RoleEntity", b =>
@@ -311,15 +393,37 @@ namespace rozetkabackend.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("rozetkabackend.Data.Entities.ProductEntity", b =>
+            modelBuilder.Entity("RozetkaApi.Data.Entities.PasswordResetToken", b =>
                 {
-                    b.HasOne("rozetkabackend.Data.Entities.CategoryEntity", "Category")
+                    b.HasOne("rozetkabackend.Entities.Identity.UserEntity", "User")
+                        .WithMany("PasswordResetTokens")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("rozetkabackend.Data.Entities.Catalog.ProductEntity", b =>
+                {
+                    b.HasOne("rozetkabackend.Data.Entities.Catalog.CategoryEntity", "Category")
                         .WithMany("Products")
                         .HasForeignKey("CategoryId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("Category");
+                });
+
+            modelBuilder.Entity("rozetkabackend.Data.Entities.Catalog.ProductImageEntity", b =>
+                {
+                    b.HasOne("rozetkabackend.Data.Entities.Catalog.ProductEntity", "Product")
+                        .WithMany("ProductImages")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Product");
                 });
 
             modelBuilder.Entity("rozetkabackend.Entities.Identity.UserLoginEntity", b =>
@@ -352,9 +456,14 @@ namespace rozetkabackend.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("rozetkabackend.Data.Entities.CategoryEntity", b =>
+            modelBuilder.Entity("rozetkabackend.Data.Entities.Catalog.CategoryEntity", b =>
                 {
                     b.Navigation("Products");
+                });
+
+            modelBuilder.Entity("rozetkabackend.Data.Entities.Catalog.ProductEntity", b =>
+                {
+                    b.Navigation("ProductImages");
                 });
 
             modelBuilder.Entity("rozetkabackend.Entities.Identity.RoleEntity", b =>
@@ -365,6 +474,8 @@ namespace rozetkabackend.Migrations
             modelBuilder.Entity("rozetkabackend.Entities.Identity.UserEntity", b =>
                 {
                     b.Navigation("Logins");
+
+                    b.Navigation("PasswordResetTokens");
 
                     b.Navigation("UserRoles");
                 });
