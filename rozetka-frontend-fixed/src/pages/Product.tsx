@@ -10,6 +10,7 @@ import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import GroupIcon from "@mui/icons-material/Group";
 import { Link as RouterLink } from "react-router-dom";
+import CategoryIcon from "@mui/icons-material/Category";
 
 type ProductRow = {
   id: number;
@@ -266,6 +267,14 @@ export default function Product() {
           >
             Перейти до користувачів
           </Button>
+          <Button
+      variant="outlined"
+      component={RouterLink}
+      to="/categorie"
+      startIcon={<CategoryIcon />}
+    >
+      Перейти до категорій
+    </Button>
         </Stack>
 
         {/* Верхня панель */}

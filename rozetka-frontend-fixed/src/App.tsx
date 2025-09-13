@@ -6,6 +6,7 @@ import ResetPassword from "./pages/ResetPassword";
 import NewPassword from "./pages/NewPassword";
 import Admin from "./pages/Admin";
 import Product from "./pages/Product";
+import Categorie from "./pages/Categorie";
 import OAuthCallback from "./pages/OAuthCallback";
 
 export default function App() {
@@ -20,7 +21,9 @@ export default function App() {
       <Route path="/product-search" element={<ProductSearch />} />
       <Route path="/new-password" element={<NewPassword />} />
       <Route path="/admin" element={<Admin />} />
-      #<Route path="/product" element={<Product />} />
+      <Route path="/product" element={<Product />} />
+      <Route path="/product" element={<Product />} />
+      <Route path="/categorie" element={<Categorie />} />
       <Route path="/oauth-callback" element={<OAuthCallback />} />
       {/* 404 */}
       <Route path="*" element={<div style={{ padding: 24 }}>Page not found</div>} />

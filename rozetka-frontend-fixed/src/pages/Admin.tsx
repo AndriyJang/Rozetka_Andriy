@@ -12,6 +12,7 @@ import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import BlockIcon from "@mui/icons-material/Block";
 import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
+import CategoryIcon from "@mui/icons-material/Category";
 
 type UserRow = {
   id: number;
@@ -230,9 +231,16 @@ export default function Admin() {
           >
             Перейти до товарів
           </Button>
+          <Button
+      variant="outlined"
+      component={RouterLink}
+      to="/categorie"
+      startIcon={<CategoryIcon />}
+    >
+      Перейти до категорій
+    </Button>
         </Stack>
-
-        {/* Верхня панель */}
+               {/* Верхня панель */}
         <Stack direction={{ xs: "column", lg: "row" }} gap={2} alignItems="center" sx={{ mb: 2 }}>
           {/* Ліва зона: показ/сховати + пошук + оновити */}
           <Stack direction="row" gap={2} alignItems="center" sx={{ flexWrap: "wrap" }}>
