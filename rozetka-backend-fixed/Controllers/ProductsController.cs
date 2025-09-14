@@ -1,6 +1,8 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RozetkaApi.Data;
+using rozetkabackend.Interfaces;
+using rozetkabackend.Models.Product;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -9,94 +11,64 @@ namespace RozetkaApi.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class ProductsController : ControllerBase
+    public class ProductsController(IProductService productService) : ControllerBase
     {
-        private readonly AppDbContext _context;
-
-        public ProductsController(AppDbContext context)
+        [HttpGet]
+        public async Task<IActionResult> List()
         {
-            _context = context;
+            var model = await productService.List();
+
+            return Ok(model);
         }
 
-        //GET: api/Products/sorting?query=milk&sortBy=price&descending=true
-        //[HttpGet("sorting")]
-        //public async Task<ActionResult<IEnumerable<Product>>> Sorting(string query, 
-        //                                                              string sortBy = null, 
-        //                                                              bool descending = false)
-        //{
-        //    // базовий запит
-        //    IQueryable<Product> products = _context.Products.Include(p => p.Category);
+        [HttpGet("id/{id}")]
+        public async Task<IActionResult> GetById(int id)
+        {
+            var model = await productService.GetById(id);
 
-        //    // пошук
-        //    if (!string.IsNullOrWhiteSpace(query))
-        //    {
-        //        var lower = query.ToLower();
-        //        products = products.Where(p =>
-        //            p.Title.ToLower().Contains(lower) ||
-        //            p.Category.Name.ToLower().Contains(lower));
-        //    }
+            return Ok(model);
+        }
 
-        //    // сортування
-        //    switch (sortBy?.ToLower())
-        //    {
-        //        case "title":
-        //            products = descending
-        //                ? products.OrderByDescending(p => p.Title)
-        //                : products.OrderBy(p => p.Title);
-        //            break;
-        //        case "price":
-        //            products = descending
-        //                ? products.OrderByDescending(p => p.Price)
-        //                : products.OrderBy(p => p.Price);
-        //            break;
-        //        case "category":
-        //            products = descending
-        //                ? products.OrderByDescending(p => p.Category.Name)
-        //                : products.OrderBy(p => p.Category.Name);
-        //            break;
-        //        default:
-        //            // якщо не вказано – сортуємо за Id
-        //            products = products.OrderBy(p => p.Id);
-        //            break;
-        //    }
+        [HttpGet("slug/{slug}")]
+        public async Task<IActionResult> GetBySlug(string slug)
+        {
+            var model = await productService.GetBySlug(slug);
 
-        //    return await products.ToListAsync();
-        //} Це Валентин зробив
+            return Ok(model);
+        }
 
-        // GET: api/Products/search?query=назва
-        //[HttpGet("search")]
-        //public async Task<ActionResult<IEnumerable<Product>>> Search(string query)
-        //{
-        //    if (string.IsNullOrWhiteSpace(query))
-        //    {
-        //        return await _context.Products
-        //            .Include(p => p.Category)
-        //            .ToListAsync();
-        //    }
+        [HttpPost("create")]
+        public async Task<IActionResult> Create([FromForm] ProductCreateModel model)
+        {
+            var salo = Request.Form;
+            if (model.ImageFiles == null)
+                return BadRequest("Image files are empty!");
 
-        //    return await _context.Products
-        //        .Include(p => p.Category)
-        //        .Where(p => p.Title.ToLower().Contains(query.ToLower()) ||
-        //                    p.Category.Name.ToLower().Contains(query.ToLower()))
-        //        .ToListAsync();
-        //}
+            var entity = await productService.Create(model);
 
-        //// GET: api/Products
-        //[HttpGet]
-        //public async Task<ActionResult<IEnumerable<Product>>> GetAll()
-        //{
-        //    return await _context.Products.Include(p => p.Category).ToListAsync();
-        //}
+            if (entity != null)
+                return Ok(entity.Id);
 
-        // GET: api/Products/look?query=milk
-        //[HttpGet]
-        //public async Task<ActionResult<IEnumerable<Product>>> LookTheProduct(string query)
-        //{
-        //    return await _context.Products
-        //        .Include(p => p.Category)
-        //        .Where(p => p.Title.ToLower().Contains(query.ToLower()) ||
-        //                    p.Category.Name.ToLower().Contains(query.ToLower()))
-        //        .ToListAsync();
-        //} Це Валентин зробив
+            else return BadRequest("Error create product!");
+        }
+
+        [HttpPut("edit")]
+        public async Task<IActionResult> Edit([FromForm] ProductEditModel model)
+        {
+            var salo = Request.Form;
+            var entity = await productService.Edit(model);
+            if (entity != null)
+                return Ok(model);
+            else return BadRequest("Error edit product!");
+        }
+
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> Delete(long id)
+        {
+            await productService.Delete(id);
+            return Ok();
+        }
+
+
     }
 }
