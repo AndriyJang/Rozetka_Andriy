@@ -1,33 +1,23 @@
-﻿using System.IO;
-using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
+﻿using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using RozetkaApi.Data;
+using System.Threading.Tasks;
 
-namespace rozetkabackend.Seeder;
-
-public static class SeedExtensions
+namespace rozetkabackend.Seeder
 {
-    public static async Task SeedData(this IApplicationBuilder app, int targetCount = 50)
+    public static class SeedExtensions
     {
-        using var scope = app.ApplicationServices.CreateScope();
-        var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>()
-                                          .CreateLogger("Seeder");
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var seeder = scope.ServiceProvider.GetRequiredService<ProductSeeder>();
-
-        var existing = await db.Products.CountAsync(p => !p.IsDeleted);
-        if (existing >= targetCount)
+        public static async Task SeedData(this IApplicationBuilder app, int targetCount = 50)
         {
-            logger.LogInformation("Seed skipped. Already have {count} products.", existing);
-            return; // ← головна умова: якщо ≥ 50 — НЕ сідимо
-        }
+            using var scope = app.ApplicationServices.CreateScope();
+            var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>()
+                                              .CreateLogger("Seeder");
+            var seeder = scope.ServiceProvider.GetRequiredService<ProductSeeder>();
 
-        await seeder.SeedAsync(targetCount);
-        logger.LogInformation("Seed done.");
+            // Викликаємо завжди. Сам сидер додає лише нестачу до targetCount.
+            await seeder.SeedAsync(targetCount);
+
+            logger.LogInformation("Seed top-up executed (target {target}).", targetCount);
+        }
     }
 }
