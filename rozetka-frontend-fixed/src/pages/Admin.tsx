@@ -6,13 +6,11 @@ import {
   Container, Typography, Table, TableHead, TableRow, TableCell, TableBody,
   Button, Dialog, DialogTitle, DialogContent, DialogActions,
   Select, MenuItem, FormControl, InputLabel, Snackbar, Alert, Box,
-  CircularProgress, TextField, Stack, Chip
+  CircularProgress, TextField, Stack, Chip, Tabs, Tab, InputAdornment
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import BlockIcon from "@mui/icons-material/Block";
-import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
-import CategoryIcon from "@mui/icons-material/Category";
 
 type UserRow = {
   id: number;
@@ -46,8 +44,8 @@ function decodeJwt<T = any>(token: string): T | null {
 export default function Admin() {
   const token = useMemo(() => localStorage.getItem("token") ?? "", []);
   const navigate = useNavigate();
+  const [tab, setTab] = useState(0); // 0=Користувачі, 1=Товари, 2=Категорії
 
-  const [showUsers, setShowUsers] = useState(false);
   const [users, setUsers] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [userSearch, setUserSearch] = useState("");
@@ -67,11 +65,9 @@ export default function Admin() {
   const [userIdInput, setUserIdInput] = useState<string>("");
 
   // notify
-  const [snack, setSnack] = useState<{ open: boolean; msg: string; type: "success" | "error" }>({
-    open: false,
-    msg: "",
-    type: "success",
-  });
+  const [snack, setSnack] = useState<{ open: boolean; msg: string; type: "success" | "error" }>(
+    { open: false, msg: "", type: "success" }
+  );
 
   // headers
   const authHeaders: Record<string, string> = { "Content-Type": "application/json" };
@@ -79,18 +75,17 @@ export default function Admin() {
 
   // Guard
   useEffect(() => {
-    if (!token) {
-      navigate("/login");
-      return;
-    }
+    if (!token) { navigate("/login"); return; }
     const payload = decodeJwt<{ roles?: string | string[] }>(token);
-    const rolesArr = Array.isArray(payload?.roles)
-      ? payload?.roles
-      : payload?.roles
-      ? [payload.roles]
-      : [];
+    const rolesArr = Array.isArray(payload?.roles) ? payload?.roles : payload?.roles ? [payload.roles] : [];
     if (!rolesArr.includes("Admin")) navigate("/product-search");
   }, [token, navigate]);
+
+  // Tabs навігація
+  useEffect(() => {
+    if (tab === 1) navigate("/product");
+    if (tab === 2) navigate("/categorie");
+  }, [tab, navigate]);
 
   const fetchUsers = async () => {
     try {
@@ -110,11 +105,8 @@ export default function Admin() {
     }
   };
 
-  const handleShowUsers = () => {
-    const next = !showUsers;
-    setShowUsers(next);
-    if (next) fetchUsers();
-  };
+  // завантажуємо автоматично, як у категоріях
+  useEffect(() => { fetchUsers(); /* eslint-disable-next-line */ }, []);
 
   const filteredUsers = users.filter((u) => {
     const q = userSearch.trim().toLowerCase();
@@ -137,22 +129,17 @@ export default function Admin() {
     if (!editUser) return;
     try {
       const res = await fetch(`${API}/api/Users/${editUser.id}/role`, {
-        method: "PUT",
-        headers: authHeaders,
-        body: JSON.stringify({ role: selectedRole }),
+        method: "PUT", headers: authHeaders, body: JSON.stringify({ role: selectedRole }),
       });
       if (!res.ok) {
         let msg = "Не вдалося оновити роль";
-        try {
-          const d = await res.json();
-          if (d?.message) msg = d.message;
-        } catch {}
+        try { const d = await res.json(); if (d?.message) msg = d.message; } catch {}
         throw new Error(msg);
       }
       setSnack({ open: true, msg: "Роль оновлено", type: "success" });
       setOpenEdit(false);
       setEditUser(null);
-      if (showUsers) fetchUsers();
+      fetchUsers();
     } catch (e: any) {
       setSnack({ open: true, msg: e?.message ?? "Помилка оновлення", type: "error" });
     }
@@ -162,16 +149,10 @@ export default function Admin() {
   const onDeleteUser = async (u: UserRow) => {
     if (!confirm(`Видалити користувача ${u.email}?`)) return;
     try {
-      const res = await fetch(`${API}/api/Users/${u.id}`, {
-        method: "DELETE",
-        headers: authHeaders,
-      });
+      const res = await fetch(`${API}/api/Users/${u.id}`, { method: "DELETE", headers: authHeaders });
       if (!res.ok) {
         let msg = "Не вдалося видалити";
-        try {
-          const d = await res.json();
-          if (d?.message) msg = d.message;
-        } catch {}
+        try { const d = await res.json(); if (d?.message) msg = d.message; } catch {}
         throw new Error(msg);
       }
       setSnack({ open: true, msg: "Користувача видалено", type: "success" });
@@ -182,18 +163,12 @@ export default function Admin() {
   };
 
   // ban (front-mock)
-  const onOpenBan = (u: UserRow) => {
-    setBanUser(u);
-    setBanOption("7d");
-    setBanDate("");
-    setOpenBan(true);
-  };
+  const onOpenBan = (u: UserRow) => { setBanUser(u); setBanOption("7d"); setBanDate(""); setOpenBan(true); };
   const calcBanUntil = (): string | null => {
     if (banOption === "forever") return "9999-12-31";
     if (banOption === "until") return banDate || null;
     const days = banOption === "1d" ? 1 : banOption === "7d" ? 7 : 30;
-    const d = new Date();
-    d.setDate(d.getDate() + days);
+    const d = new Date(); d.setDate(d.getDate() + days);
     return d.toISOString().slice(0, 10);
   };
   const onSaveBan = () => {
@@ -201,8 +176,7 @@ export default function Admin() {
     const until = calcBanUntil();
     setUsers((prev) => prev.map((u) => (u.id === banUser.id ? { ...u, bannedUntil: until } : u)));
     setSnack({ open: true, msg: until ? `Забанено до ${until}` : "Бан знято", type: "success" });
-    setOpenBan(false);
-    setBanUser(null);
+    setOpenBan(false); setBanUser(null);
   };
 
   // ===== ШВИДКІ ДІЇ ЗА ID =====
@@ -210,26 +184,18 @@ export default function Admin() {
 
   const changeRoleById = async () => {
     const id = Number(userIdInput);
-    if (!id) {
-      setSnack({ open: true, msg: "Вкажіть коректний ID", type: "error" });
-      return;
-    }
+    if (!id) { setSnack({ open: true, msg: "Вкажіть коректний ID", type: "error" }); return; }
     try {
       const res = await fetch(`${API}/api/Users/${id}/role`, {
-        method: "PUT",
-        headers: authHeaders,
-        body: JSON.stringify({ role: quickRole }),
+        method: "PUT", headers: authHeaders, body: JSON.stringify({ role: quickRole }),
       });
       if (!res.ok) {
         let msg = "Не вдалося оновити роль";
-        try {
-          const d = await res.json();
-          if (d?.message) msg = d.message;
-        } catch {}
+        try { const d = await res.json(); if (d?.message) msg = d.message; } catch {}
         throw new Error(msg);
       }
       setSnack({ open: true, msg: `Роль користувача #${id} оновлено`, type: "success" });
-      if (showUsers) await fetchUsers();
+      fetchUsers();
     } catch (e: any) {
       setSnack({ open: true, msg: e?.message ?? "Помилка оновлення ролі", type: "error" });
     }
@@ -237,23 +203,17 @@ export default function Admin() {
 
   const deleteUserById = async () => {
     const id = Number(userIdInput);
-    if (!id) {
-      setSnack({ open: true, msg: "Вкажіть коректний ID", type: "error" });
-      return;
-    }
+    if (!id) { setSnack({ open: true, msg: "Вкажіть коректний ID", type: "error" }); return; }
     if (!confirm(`Видалити користувача #${id}?`)) return;
     try {
       const res = await fetch(`${API}/api/Users/${id}`, { method: "DELETE", headers: authHeaders });
       if (!res.ok) {
         let msg = "Не вдалося видалити";
-        try {
-          const d = await res.json();
-          if (d?.message) msg = d.message;
-        } catch {}
+        try { const d = await res.json(); if (d?.message) msg = d.message; } catch {}
         throw new Error(msg);
       }
       setSnack({ open: true, msg: `Користувача #${id} видалено`, type: "success" });
-      if (showUsers) setUsers((prev) => prev.filter((u) => u.id !== id));
+      setUsers((prev) => prev.filter((u) => u.id !== id));
     } catch (e: any) {
       setSnack({ open: true, msg: e?.message ?? "Помилка видалення", type: "error" });
     }
@@ -261,10 +221,7 @@ export default function Admin() {
 
   const openBanById = () => {
     const id = Number(userIdInput);
-    if (!id) {
-      setSnack({ open: true, msg: "Вкажіть коректний ID", type: "error" });
-      return;
-    }
+    if (!id) { setSnack({ open: true, msg: "Вкажіть коректний ID", type: "error" }); return; }
     const u = users.find((x) => x.id === id) ?? ({ id, email: `(ID ${id})`, roles: [] } as UserRow);
     onOpenBan(u);
   };
@@ -272,118 +229,109 @@ export default function Admin() {
   return (
     <Layout>
       <Container maxWidth="lg" sx={{ mt: 4, mb: 8 }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-          <Typography variant="h5" sx={{ fontWeight: "bold" }}>Користувачі (адмін)</Typography>
-          <Button variant="outlined" component={RouterLink} to="/product" startIcon={<ShoppingCartIcon />}>
-            Перейти до товарів
-          </Button>
-          <Button variant="outlined" component={RouterLink} to="/categorie" startIcon={<CategoryIcon />}>
-            Перейти до категорій
+        <Typography variant="h5" sx={{ mb: 2, fontWeight: "bold" }}>
+          Кабінет адміністратора — користувачі
+        </Typography>
+
+        {/* Tabs як у категоріях */}
+        <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
+          <Tab label="Користувачі" />
+          <Tab label="Товари" component={RouterLink} to="/product" />
+          <Tab label="Категорії" component={RouterLink} to="/categorie" />
+        </Tabs>
+
+        {/* Верхня панель: пошук + оновити */}
+        <Stack direction={{ xs: "column", md: "row" }} gap={2} alignItems="center" sx={{ mb: 2 }}>
+          <TextField
+            size="small"
+            placeholder="Пошук (email, ім'я, телефон, роль)"
+            value={userSearch}
+            onChange={(e) => setUserSearch(e.target.value)}
+            sx={{ flex: 1, minWidth: 260 }}
+          />
+          <Button variant="outlined" onClick={fetchUsers} disabled={loading}>
+            Оновити
           </Button>
         </Stack>
 
-        {/* Верхня панель */}
-        <Stack direction={{ xs: "column", lg: "row" }} gap={2} alignItems="center" sx={{ mb: 2 }}>
-          {/* Ліва зона */}
-          <Stack direction="row" gap={2} alignItems="center" sx={{ flexWrap: "wrap" }}>
-            <Button variant="contained" onClick={handleShowUsers}>
-              {showUsers ? "Сховати користувачів" : "Показати користувачів"}
-            </Button>
-            {showUsers && (
-              <>
-                <TextField
-                  size="small"
-                  placeholder="Пошук (email, ім'я, телефон, роль)"
-                  value={userSearch}
-                  onChange={(e) => setUserSearch(e.target.value)}
-                  sx={{ minWidth: 260 }}
-                />
-                <Button variant="outlined" onClick={fetchUsers} disabled={loading}>
-                  Оновити
-                </Button>
-              </>
-            )}
-          </Stack>
-
-          {/* Права зона */}
-          <Stack direction={{ xs: "column", sm: "row" }} gap={1.5} alignItems="center" sx={{ ml: "auto", flexWrap: "wrap" }}>
-            <TextField
-              label="ID користувача"
-              size="small"
-              type="number"
-              value={userIdInput}
-              onChange={(e) => setUserIdInput(e.target.value)}
-              sx={{ width: 170 }}
-            />
-            <FormControl size="small" sx={{ minWidth: 140 }}>
-              <InputLabel id="role-quick-label">Роль</InputLabel>
-              <Select
-                labelId="role-quick-label"
-                value={quickRole}
-                onChange={(e) => setQuickRole(e.target.value as "User" | "Admin")}
-              >
-                <MenuItem value="User">User</MenuItem>
-                <MenuItem value="Admin">Admin</MenuItem>
-              </Select>
-            </FormControl>
-            <Button variant="outlined" onClick={changeRoleById} startIcon={<EditIcon />}>
-              Роль за ID
-            </Button>
-            <Button variant="outlined" color="warning" onClick={openBanById} startIcon={<BlockIcon />}>
-              Бан за ID
-            </Button>
-            <Button variant="outlined" color="error" onClick={deleteUserById} startIcon={<DeleteIcon />}>
-              Видалити за ID
-            </Button>
-          </Stack>
+        {/* Швидкі дії за ID як у категоріях (окремий блок) */}
+        <Stack direction={{ xs: "column", md: "row" }} gap={1.5} alignItems="center" sx={{ mb: 2 }}>
+          <TextField
+            size="small"
+            label="ID користувача"
+            type="number"
+            value={userIdInput}
+            onChange={(e) => setUserIdInput(e.target.value)}
+            sx={{ width: 200 }}
+            InputProps={{ startAdornment: <InputAdornment position="start">#</InputAdornment> }}
+          />
+          <FormControl size="small" sx={{ minWidth: 140 }}>
+            <InputLabel id="role-quick-label">Роль</InputLabel>
+            <Select
+              labelId="role-quick-label"
+              value={quickRole}
+              label="Роль"
+              onChange={(e) => setQuickRole(e.target.value as "User" | "Admin")}
+            >
+              <MenuItem value="User">User</MenuItem>
+              <MenuItem value="Admin">Admin</MenuItem>
+            </Select>
+          </FormControl>
+          <Button variant="outlined" onClick={changeRoleById} startIcon={<EditIcon />}>
+            Роль за ID
+          </Button>
+          <Button variant="outlined" color="warning" onClick={openBanById} startIcon={<BlockIcon />}>
+            Бан за ID
+          </Button>
+          <Button variant="outlined" color="error" onClick={deleteUserById} startIcon={<DeleteIcon />}>
+            Видалити за ID
+          </Button>
         </Stack>
 
         {/* Таблиця користувачів */}
-        {showUsers && (
-          loading ? (
-            <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
-              <CircularProgress />
-            </Box>
-          ) : (
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>ID</TableCell>
-                  <TableCell>Email</TableCell>
-                  <TableCell>Ім&apos;я</TableCell>
-                  <TableCell>Телефон</TableCell>
-                  <TableCell>Ролі</TableCell>
-                  <TableCell>Бан</TableCell>
-                  <TableCell align="right">Дії</TableCell>
+        {loading ? (
+          <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
+            <CircularProgress />
+          </Box>
+        ) : (
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>ID</TableCell>
+                <TableCell>Email</TableCell>
+                <TableCell>Ім&apos;я</TableCell>
+                <TableCell>Телефон</TableCell>
+                <TableCell>Ролі</TableCell>
+                <TableCell>Бан</TableCell>
+                <TableCell align="right">Дії</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {filteredUsers.map((u) => (
+                <TableRow key={u.id}>
+                  <TableCell>{u.id}</TableCell>
+                  <TableCell>{u.email}</TableCell>
+                  <TableCell>{u.firstName ?? "-"}</TableCell>
+                  <TableCell>{u.phoneNumber ?? "-"}</TableCell>
+                  <TableCell>{u.roles?.join(", ") || "—"}</TableCell>
+                  <TableCell>
+                    {u.bannedUntil
+                      ? <Chip size="small" color="error" label={`до ${u.bannedUntil}`} />
+                      : <Chip size="small" color="success" label="нема" />
+                    }
+                  </TableCell>
+                  <TableCell align="right">
+                    <Button size="small" onClick={() => onOpenEdit(u)} startIcon={<EditIcon />}>Змінити роль</Button>
+                    <Button size="small" color="warning" onClick={() => onOpenBan(u)} startIcon={<BlockIcon />}>Забанити</Button>
+                    <Button size="small" color="error" onClick={() => onDeleteUser(u)} startIcon={<DeleteIcon />}>Видалити</Button>
+                  </TableCell>
                 </TableRow>
-              </TableHead>
-              <TableBody>
-                {filteredUsers.map((u) => (
-                  <TableRow key={u.id}>
-                    <TableCell>{u.id}</TableCell>
-                    <TableCell>{u.email}</TableCell>
-                    <TableCell>{u.firstName ?? "-"}</TableCell>
-                    <TableCell>{u.phoneNumber ?? "-"}</TableCell>
-                    <TableCell>{u.roles?.join(", ") || "—"}</TableCell>
-                    <TableCell>
-                      {u.bannedUntil
-                        ? <Chip size="small" color="error" label={`до ${u.bannedUntil}`} />
-                        : <Chip size="small" color="success" label="нема" />
-                      }
-                    </TableCell>
-                    <TableCell align="right">
-                      <Button size="small" onClick={() => onOpenEdit(u)} startIcon={<EditIcon />}>Змінити роль</Button>
-                      <Button size="small" color="warning" onClick={() => onOpenBan(u)} startIcon={<BlockIcon />}>Забанити</Button>
-                      <Button size="small" color="error" onClick={() => onDeleteUser(u)} startIcon={<DeleteIcon />}>Видалити</Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {filteredUsers.length === 0 && (
-                  <TableRow><TableCell colSpan={7} align="center">Немає даних</TableCell></TableRow>
-                )}
-              </TableBody>
-            </Table>
-          )
+              ))}
+              {filteredUsers.length === 0 && (
+                <TableRow><TableCell colSpan={7} align="center">Немає даних</TableCell></TableRow>
+              )}
+            </TableBody>
+          </Table>
         )}
 
         {/* Edit role dialog */}
@@ -396,6 +344,7 @@ export default function Admin() {
               <Select
                 labelId="role-label"
                 value={selectedRole}
+                label="Роль"
                 onChange={(e) => setSelectedRole(e.target.value as string)}
               >
                 <MenuItem value="User">User</MenuItem>
@@ -419,6 +368,7 @@ export default function Admin() {
               <Select
                 labelId="ban-label"
                 value={banOption}
+                label="Термін"
                 onChange={(e) => setBanOption(e.target.value as typeof banOption)}
               >
                 <MenuItem value="1d">1 день</MenuItem>
