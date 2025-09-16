@@ -1,4 +1,3 @@
-// src/pages/Admin.tsx
 import Layout from "../components/Layout";
 import { useMemo, useState, useEffect } from "react";
 import { Link as RouterLink, useNavigate } from "react-router-dom";
@@ -6,11 +5,12 @@ import {
   Container, Typography, Table, TableHead, TableRow, TableCell, TableBody,
   Button, Dialog, DialogTitle, DialogContent, DialogActions,
   Select, MenuItem, FormControl, InputLabel, Snackbar, Alert, Box,
-  CircularProgress, TextField, Stack, Chip, Tabs, Tab, InputAdornment
+  CircularProgress, TextField, Stack, Chip, Tabs, Tab, InputAdornment, Paper
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import BlockIcon from "@mui/icons-material/Block";
+import LogoutIcon from "@mui/icons-material/Logout";
 
 type UserRow = {
   id: number;
@@ -49,6 +49,9 @@ export default function Admin() {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [userSearch, setUserSearch] = useState("");
+
+  // показ списку (за замовчуванням приховано)
+  const [showList, setShowList] = useState(false);
 
   // Edit role
   const [openEdit, setOpenEdit] = useState(false);
@@ -105,8 +108,12 @@ export default function Admin() {
     }
   };
 
-  // завантажуємо автоматично, як у категоріях
-  useEffect(() => { fetchUsers(); /* eslint-disable-next-line */ }, []);
+  // завантажуємо ЛИШЕ при відкритті списку
+  const toggleList = async () => {
+    const next = !showList;
+    setShowList(next);
+    if (next && users.length === 0) await fetchUsers();
+  };
 
   const filteredUsers = users.filter((u) => {
     const q = userSearch.trim().toLowerCase();
@@ -163,6 +170,7 @@ export default function Admin() {
   };
 
   // ban (front-mock)
+  const [banUserState, setBanUserState] = useState<{until: string | null}>({until: null});
   const onOpenBan = (u: UserRow) => { setBanUser(u); setBanOption("7d"); setBanDate(""); setOpenBan(true); };
   const calcBanUntil = (): string | null => {
     if (banOption === "forever") return "9999-12-31";
@@ -226,21 +234,26 @@ export default function Admin() {
     onOpenBan(u);
   };
 
+  const onLogout = () => { localStorage.removeItem("token"); localStorage.removeItem("roles"); navigate("/login"); };
+
   return (
     <Layout>
       <Container maxWidth="lg" sx={{ mt: 4, mb: 8 }}>
-        <Typography variant="h5" sx={{ mb: 2, fontWeight: "bold" }}>
-          Кабінет адміністратора — користувачі
-        </Typography>
+        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+          <Typography variant="h5" sx={{ fontWeight: "bold" }}>
+            Кабінет адміністратора — користувачі
+          </Typography>
+          <Button variant="text" onClick={onLogout} startIcon={<LogoutIcon />}>Вийти</Button>
+        </Stack>
 
-        {/* Tabs як у категоріях */}
+        {/* Tabs */}
         <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
           <Tab label="Користувачі" />
           <Tab label="Товари" component={RouterLink} to="/product" />
           <Tab label="Категорії" component={RouterLink} to="/categorie" />
         </Tabs>
 
-        {/* Верхня панель: пошук + оновити */}
+        {/* Верхня панель: пошук + оновити + показати/сховати */}
         <Stack direction={{ xs: "column", md: "row" }} gap={2} alignItems="center" sx={{ mb: 2 }}>
           <TextField
             size="small"
@@ -252,9 +265,12 @@ export default function Admin() {
           <Button variant="outlined" onClick={fetchUsers} disabled={loading}>
             Оновити
           </Button>
+          <Button variant="outlined" onClick={async ()=>await toggleList()}>
+            {showList ? "Сховати список" : "Показати список"}
+          </Button>
         </Stack>
 
-        {/* Швидкі дії за ID як у категоріях (окремий блок) */}
+        {/* Швидкі дії за ID */}
         <Stack direction={{ xs: "column", md: "row" }} gap={1.5} alignItems="center" sx={{ mb: 2 }}>
           <TextField
             size="small"
@@ -288,50 +304,54 @@ export default function Admin() {
           </Button>
         </Stack>
 
-        {/* Таблиця користувачів */}
-        {loading ? (
-          <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
-            <CircularProgress />
-          </Box>
-        ) : (
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>ID</TableCell>
-                <TableCell>Email</TableCell>
-                <TableCell>Ім&apos;я</TableCell>
-                <TableCell>Телефон</TableCell>
-                <TableCell>Ролі</TableCell>
-                <TableCell>Бан</TableCell>
-                <TableCell align="right">Дії</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {filteredUsers.map((u) => (
-                <TableRow key={u.id}>
-                  <TableCell>{u.id}</TableCell>
-                  <TableCell>{u.email}</TableCell>
-                  <TableCell>{u.firstName ?? "-"}</TableCell>
-                  <TableCell>{u.phoneNumber ?? "-"}</TableCell>
-                  <TableCell>{u.roles?.join(", ") || "—"}</TableCell>
-                  <TableCell>
-                    {u.bannedUntil
-                      ? <Chip size="small" color="error" label={`до ${u.bannedUntil}`} />
-                      : <Chip size="small" color="success" label="нема" />
-                    }
-                  </TableCell>
-                  <TableCell align="right">
-                    <Button size="small" onClick={() => onOpenEdit(u)} startIcon={<EditIcon />}>Змінити роль</Button>
-                    <Button size="small" color="warning" onClick={() => onOpenBan(u)} startIcon={<BlockIcon />}>Забанити</Button>
-                    <Button size="small" color="error" onClick={() => onDeleteUser(u)} startIcon={<DeleteIcon />}>Видалити</Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {filteredUsers.length === 0 && (
-                <TableRow><TableCell colSpan={7} align="center">Немає даних</TableCell></TableRow>
-              )}
-            </TableBody>
-          </Table>
+        {/* Таблиця користувачів (картка) */}
+        {showList && (
+          loading ? (
+            <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
+              <CircularProgress />
+            </Box>
+          ) : (
+            <Paper elevation={3} sx={{ borderRadius: 3, overflow: "hidden" }}>
+              <Table sx={{ "& .MuiTableCell-root": { borderBottom: theme => `1px solid ${theme.palette.divider}` } }}>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>ID</TableCell>
+                    <TableCell>Email</TableCell>
+                    <TableCell>Ім&apos;я</TableCell>
+                    <TableCell>Телефон</TableCell>
+                    <TableCell>Ролі</TableCell>
+                    <TableCell>Бан</TableCell>
+                    <TableCell align="right">Дії</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {filteredUsers.map((u) => (
+                    <TableRow key={u.id}>
+                      <TableCell>{u.id}</TableCell>
+                      <TableCell>{u.email}</TableCell>
+                      <TableCell>{u.firstName ?? "-"}</TableCell>
+                      <TableCell>{u.phoneNumber ?? "-"}</TableCell>
+                      <TableCell>{u.roles?.join(", ") || "—"}</TableCell>
+                      <TableCell>
+                        {u.bannedUntil
+                          ? <Chip size="small" color="error" label={`до ${u.bannedUntil}`} />
+                          : <Chip size="small" color="success" label="нема" />
+                        }
+                      </TableCell>
+                      <TableCell align="right">
+                        <Button size="small" onClick={() => onOpenEdit(u)} startIcon={<EditIcon />}>Змінити роль</Button>
+                        <Button size="small" color="warning" onClick={() => onOpenBan(u)} startIcon={<BlockIcon />}>Забанити</Button>
+                        <Button size="small" color="error" onClick={() => onDeleteUser(u)} startIcon={<DeleteIcon />}>Видалити</Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {filteredUsers.length === 0 && (
+                    <TableRow><TableCell colSpan={7} align="center">Немає даних</TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </Paper>
+          )
         )}
 
         {/* Edit role dialog */}

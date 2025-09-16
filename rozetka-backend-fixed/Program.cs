@@ -146,6 +146,10 @@ app.UseStaticFiles(new StaticFileOptions
     RequestPath = $"/{dir}"
 });
 
-await app.SeedData();
+// 1) Базовий сидер (ролі/юзери/категорії)
+await rozetkabackend.DbSeeder.SeedData(app);
+
+// 2) Продуктовий сидер (досісти до 50 шт)
+await rozetkabackend.Seeder.SeedExtensions.SeedData(app, 50);
 
 app.Run();

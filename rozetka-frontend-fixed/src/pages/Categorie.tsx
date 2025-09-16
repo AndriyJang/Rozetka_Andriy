@@ -1,13 +1,13 @@
-// src/pages/Categorie.tsx
 import Layout from "../components/Layout";
 import { useEffect, useMemo, useState } from "react";
 import {
   Container, Typography, Table, TableHead, TableRow, TableCell, TableBody,
   IconButton, Button, Dialog, DialogTitle, DialogContent, DialogActions,
-  TextField, Stack, Snackbar, Alert, Box, CircularProgress, Tabs, Tab, InputAdornment
+  TextField, Stack, Snackbar, Alert, Box, CircularProgress, Tabs, Tab, InputAdornment, Paper
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
+import LogoutIcon from "@mui/icons-material/Logout";
 import { Link as RouterLink, useNavigate } from "react-router-dom";
 
 type CategoryRow = { id: number; name: string; slug?: string; image?: string; };
@@ -74,6 +74,9 @@ export default function Categorie() {
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
 
+  // список за замовчуванням приховано
+  const [showList, setShowList] = useState(false);
+
   // форма create/edit
   const [openForm, setOpenForm] = useState(false);
   const [editItem, setEditItem] = useState<CategoryRow | null>(null);
@@ -114,7 +117,11 @@ export default function Categorie() {
     }
   };
 
-  useEffect(() => { fetchCategories(); /* eslint-disable-next-line */ }, []);
+  const toggleList = async () => {
+    const next = !showList;
+    setShowList(next);
+    if (next && rows.length === 0) await fetchCategories();
+  };
 
   const filtered = rows.filter(r => {
     const q = search.trim().toLowerCase();
@@ -142,18 +149,16 @@ export default function Categorie() {
     const fd = new FormData();
     fd.append("Name", payload.name.trim());
     fd.append("Slug", payload.slug.trim());
-    fd.append("ImageFile", payload.file, payload.file.name); // КЛЮЧ ДЛЯ БЕКЕНДУ
+    fd.append("ImageFile", payload.file, payload.file.name);
     return fd;
   }
 
   function buildUpdateFormData(id: number, payload: { name: string; slug: string; file?: File | null }) {
     const fd = new FormData();
-    fd.append("Id", String(id));                 // PUT без /{id}: Id у формі
+    fd.append("Id", String(id));
     fd.append("Name", payload.name.trim());
     fd.append("Slug", payload.slug.trim());
-    if (payload.file) {
-      fd.append("ImageFile", payload.file, payload.file.name); // опціонально
-    }
+    if (payload.file) fd.append("ImageFile", payload.file, payload.file.name);
     return fd;
   }
 
@@ -184,7 +189,6 @@ export default function Categorie() {
       try { const d = await res.json(); if (d?.message) msg = d.message; } catch {}
       throw new Error(msg);
     }
-    // навіть якщо відповідь не містить нові значення — нижче все одно перезавантажимо список
     await res.json().catch(() => null);
   };
 
@@ -205,7 +209,7 @@ export default function Categorie() {
     try {
       if (editItem) {
         await updateCategory(editItem.id, { name: nm, slug: sg, file });
-        await fetchCategories(); // показуємо фактичні дані з БД
+        await fetchCategories();
         setSnack({open:true, msg:"Категорію оновлено", type:"success"});
       } else {
         if (!file) { setSnack({ open:true, msg:"Додайте зображення (ImageFile) для категорії", type:"error" }); return; }
@@ -246,12 +250,17 @@ export default function Categorie() {
     await onDeleteClick(row);
   };
 
+  const onLogout = () => { localStorage.removeItem("token"); localStorage.removeItem("roles"); navigate("/login"); };
+
   return (
     <Layout>
       <Container maxWidth="lg" sx={{ mt: 4, mb: 8 }}>
-        <Typography variant="h5" sx={{ mb: 2, fontWeight: "bold" }}>
-          Кабінет адміністратора — категорії
-        </Typography>
+        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+          <Typography variant="h5" sx={{ fontWeight: "bold" }}>
+            Кабінет адміністратора — категорії
+          </Typography>
+          <Button variant="text" onClick={onLogout} startIcon={<LogoutIcon />}>Вийти</Button>
+        </Stack>
 
         <Tabs value={tab} onChange={(_,v)=>setTab(v)} sx={{ mb: 2 }}>
           <Tab label="Користувачі" component={RouterLink} to="/admin" />
@@ -268,9 +277,11 @@ export default function Categorie() {
             sx={{ flex: 1, minWidth: 260 }}
           />
           <Button variant="outlined" onClick={fetchCategories} disabled={loading}>Оновити</Button>
+          <Button variant="outlined" onClick={toggleList}>{showList ? "Сховати список" : "Показати список"}</Button>
           <Button variant="contained" onClick={() => onOpenForm()}>Додати категорію</Button>
         </Stack>
 
+        {/* Швидкі дії за ID */}
         <Stack direction={{ xs:"column", md:"row" }} gap={1.5} alignItems="center" sx={{ mb: 2 }}>
           <TextField
             size="small"
@@ -289,39 +300,43 @@ export default function Categorie() {
           </Button>
         </Stack>
 
-        {loading ? (
-          <Box sx={{ display:"flex", justifyContent:"center", py:6 }}>
-            <CircularProgress />
-          </Box>
-        ) : (
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>ID</TableCell>
-                <TableCell>Назва</TableCell>
-                <TableCell>Slug</TableCell>
-                <TableCell align="right">Дії</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {filtered.map((r) => (
-                <TableRow key={r.id}>
-                  <TableCell>{r.id}</TableCell>
-                  <TableCell>{r.name}</TableCell>
-                  <TableCell>{r.slug ?? "-"}</TableCell>
-                  <TableCell align="right">
-                    <IconButton onClick={() => onOpenForm(r)} title="Редагувати"><EditIcon /></IconButton>
-                    <IconButton onClick={() => onDeleteClick(r)} title="Видалити" color="error"><DeleteIcon /></IconButton>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {filtered.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={4} align="center">Немає даних</TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+        {showList && (
+          loading ? (
+            <Box sx={{ display:"flex", justifyContent:"center", py:6 }}>
+              <CircularProgress />
+            </Box>
+          ) : (
+            <Paper elevation={3} sx={{ borderRadius: 3, overflow: "hidden" }}>
+              <Table sx={{ "& .MuiTableCell-root": { borderBottom: theme => `1px solid ${theme.palette.divider}` } }}>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>ID</TableCell>
+                    <TableCell>Назва</TableCell>
+                    <TableCell>Slug</TableCell>
+                    <TableCell align="right">Дії</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {filtered.map((r) => (
+                    <TableRow key={r.id}>
+                      <TableCell>{r.id}</TableCell>
+                      <TableCell>{r.name}</TableCell>
+                      <TableCell>{r.slug ?? "-"}</TableCell>
+                      <TableCell align="right">
+                        <IconButton onClick={() => onOpenForm(r)} title="Редагувати"><EditIcon /></IconButton>
+                        <IconButton onClick={() => onDeleteClick(r)} title="Видалити" color="error"><DeleteIcon /></IconButton>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {filtered.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={4} align="center">Немає даних</TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </Paper>
+          )
         )}
 
         {/* модалка додати/редагувати */}
@@ -335,7 +350,6 @@ export default function Categorie() {
                 onChange={(e)=>{
                   const val = e.target.value;
                   setName(val);
-                  // якщо користувач не правив вручну — автооновлюємо слаг
                   if (!editItem || slug === "" || slug === slugify(name)) {
                     setSlug(slugify(val));
                   }

@@ -1,13 +1,17 @@
-// src/pages/Product.tsx
 import Layout from "../components/Layout";
 import { useMemo, useState, useEffect } from "react";
 import {
   Container, Typography, Table, TableHead, TableRow, TableCell, TableBody,
   Button, Dialog, DialogTitle, DialogContent, DialogActions,
-  TextField, FormControlLabel, Checkbox, Stack, Snackbar, Alert, Box, CircularProgress, Tabs, Tab, InputAdornment
+  TextField, FormControlLabel, Checkbox, Stack, Snackbar, Alert,
+  Box, CircularProgress, Tabs, Tab, InputAdornment, IconButton, Paper
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
+import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
+import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import LogoutIcon from "@mui/icons-material/Logout";
+import { Link as RouterLink, useNavigate } from "react-router-dom";
 
 // ---- Типи відповідно до твоїх моделей ----
 type ProductRow = {
@@ -29,13 +33,14 @@ type ProductRow = {
 type ApiProductImage = { id: number; name: string; priority: number };
 
 const API = import.meta.env.VITE_API_URL;
+const IMG_BASE = `${API}/images/`;
 
 // --- Ендпоінти згідно бекенду ---
-const PRODUCTS_LIST = `${API}/api/Products`;                      // GET (усі)
+const PRODUCTS_LIST = `${API}/api/Products`;                           // GET (усі)
 const PRODUCT_GET_ID = (id: number) => `${API}/api/Products/id/${id}`; // GET id/{id}
-const PRODUCT_CREATE = `${API}/api/Products/create`;              // POST [FromForm]
-const PRODUCT_EDIT = `${API}/api/Products/edit`;                  // PUT  [FromForm]
-const PRODUCT_DELETE = (id: number) => `${API}/api/Products/${id}`;     // DELETE {id}
+const PRODUCT_CREATE = `${API}/api/Products/create`;                   // POST [FromForm]
+const PRODUCT_EDIT = `${API}/api/Products/edit`;                       // PUT  [FromForm]
+const PRODUCT_DELETE = (id: number) => `${API}/api/Products/${id}`;    // DELETE {id}
 
 // ---- slugify для Name -> Slug ----
 function slugify(input: string): string {
@@ -78,12 +83,23 @@ const mapFromApi = (x: any): ProductRow => {
 };
 
 export default function Product() {
+  const navigate = useNavigate();
   const token = useMemo(() => localStorage.getItem("token") ?? "", []);
   const [tab, setTab] = useState(1); // 0=Користувачі, 1=Товари, 2=Категорії
 
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
+
+  // показ списку (за замовчуванням приховано)
+  const [showList, setShowList] = useState(false);
+
+  // стан для індексу картинок у кожного продукту
+  const [imgIdx, setImgIdx] = useState<Record<number, number>>({});
+  const nextImg = (id: number, len: number) =>
+    setImgIdx(s => ({ ...s, [id]: ((s[id] ?? 0) + 1) % len }));
+  const prevImg = (id: number, len: number) =>
+    setImgIdx(s => ({ ...s, [id]: ((s[id] ?? 0) - 1 + len) % len }));
 
   const [openProduct, setOpenProduct] = useState(false);
   const [editProduct, setEditProduct] = useState<ProductRow | null>(null);
@@ -121,7 +137,6 @@ export default function Product() {
   if (token) authHeadersOnlyAuth.Authorization = `Bearer ${token}`;
 
   // Tabs навігація
-  const navigate = useNavigateSafe();
   useEffect(() => {
     if (tab === 0) navigate("/admin");
     if (tab === 2) navigate("/categorie");
@@ -146,8 +161,12 @@ export default function Product() {
     }
   };
 
-  // автоматичне завантаження, як у категоріях
-  useEffect(() => { fetchProducts(); /* eslint-disable-next-line */ }, []);
+  // завантажуємо ЛИШЕ коли користувач відкриває список
+  const toggleList = async () => {
+    const next = !showList;
+    setShowList(next);
+    if (next && products.length === 0) await fetchProducts();
+  };
 
   const filteredProducts = products.filter(p => {
     const q = search.trim().toLowerCase();
@@ -313,21 +332,25 @@ export default function Product() {
     }
   };
 
+  const onLogout = () => { localStorage.removeItem("token"); localStorage.removeItem("roles"); navigate("/login"); };
+
   return (
     <Layout>
       <Container maxWidth="lg" sx={{ mt: 4, mb: 8 }}>
-        <Typography variant="h5" sx={{ mb: 2, fontWeight: "bold" }}>
-          Кабінет адміністратора — товари
-        </Typography>
+        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+          <Typography variant="h5" sx={{ fontWeight: "bold" }}>
+            Кабінет адміністратора — товари
+          </Typography>
+          <Button variant="text" onClick={onLogout} startIcon={<LogoutIcon />}>Вийти</Button>
+        </Stack>
 
-        {/* Tabs як у категоріях */}
         <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
-          <Tab label="Користувачі" component={RouterLinkSafe} to="/admin" />
+          <Tab label="Користувачі" component={RouterLink} to="/admin" />
           <Tab label="Товари" />
-          <Tab label="Категорії" component={RouterLinkSafe} to="/categorie" />
+          <Tab label="Категорії" component={RouterLink} to="/categorie" />
         </Tabs>
 
-        {/* Верхня панель: пошук + оновити + додати */}
+        {/* Верхня панель: пошук + оновити + показати/сховати + додати */}
         <Stack direction={{ xs: "column", md: "row" }} gap={2} alignItems="center" sx={{ mb: 2 }}>
           <TextField
             size="small"
@@ -337,6 +360,7 @@ export default function Product() {
             sx={{ flex: 1, minWidth: 260 }}
           />
           <Button variant="outlined" onClick={fetchProducts} disabled={loading}>Оновити</Button>
+          <Button variant="outlined" onClick={toggleList}>{showList ? "Сховати список" : "Показати список"}</Button>
           <Button variant="contained" onClick={() => onOpenProduct()}>Додати товар</Button>
         </Stack>
 
@@ -359,46 +383,89 @@ export default function Product() {
           </Button>
         </Stack>
 
-        {/* Таблиця товарів */}
-        {loading ? (
-          <Box sx={{ display:"flex", justifyContent:"center", py:6 }}>
-            <CircularProgress />
-          </Box>
-        ) : (
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>ID</TableCell>
-                <TableCell>Назва</TableCell>
-                <TableCell>Slug</TableCell>
-                <TableCell>Ціна</TableCell>
-                <TableCell>Категорія (ID)</TableCell>
-                <TableCell>Фото (шт.)</TableCell>
-                <TableCell align="right">Дії</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {filteredProducts.map((p) => (
-                <TableRow key={p.id}>
-                  <TableCell>{p.id}</TableCell>
-                  <TableCell>{p.name}</TableCell>
-                  <TableCell>{p.slug || "-"}</TableCell>
-                  <TableCell>{p.price.toLocaleString()} грн</TableCell>
-                  <TableCell>{p.categoryId}</TableCell>
-                  <TableCell>{p.images?.length ?? 0}</TableCell>
-                  <TableCell align="right">
-                    <Button size="small" onClick={() => onOpenProduct(p)} startIcon={<EditIcon />}>Редагувати</Button>
-                    <Button size="small" color="error" onClick={() => onDeleteProductClick(p)} startIcon={<DeleteIcon />}>Видалити</Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {filteredProducts.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={7} align="center">Немає даних</TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+        {/* Таблиця товарів (картка) */}
+        {showList && (
+          loading ? (
+            <Box sx={{ display:"flex", justifyContent:"center", py:6 }}>
+              <CircularProgress />
+            </Box>
+          ) : (
+            <Paper elevation={3} sx={{ borderRadius: 3, overflow: "hidden" }}>
+              <Table sx={{ "& .MuiTableCell-root": { borderBottom: theme => `1px solid ${theme.palette.divider}` } }}>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>ID</TableCell>
+                    <TableCell>Назва</TableCell>
+                    <TableCell>Slug</TableCell>
+                    <TableCell>Ціна</TableCell>
+                    <TableCell>Категорія (ID)</TableCell>
+                    <TableCell>Фото</TableCell>
+                    <TableCell align="right">Дії</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {filteredProducts.map((p) => (
+                    <TableRow key={p.id}>
+                      <TableCell>{p.id}</TableCell>
+                      <TableCell>{p.name}</TableCell>
+                      <TableCell>{p.slug || "-"}</TableCell>
+                      <TableCell>{p.price.toLocaleString()} грн</TableCell>
+                      <TableCell>{p.categoryId}</TableCell>
+                      <TableCell>
+                        {p.images?.length ? (
+                          <Box sx={{
+                            position: "relative", width: 140, height: 94,
+                            border: theme => `1px solid ${theme.palette.divider}`,
+                            borderRadius: 1, overflow: "hidden", bgcolor: "background.paper"
+                          }}>
+                            <img
+                              src={`${IMG_BASE}${p.images[imgIdx[p.id] ?? 0]}`}
+                              alt={p.name}
+                              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                            />
+                            {p.images.length > 1 && (
+                              <>
+                                <IconButton
+                                  size="small"
+                                  onClick={() => prevImg(p.id, p.images.length)}
+                                  sx={{ position: "absolute", top: "50%", left: 4, transform: "translateY(-50%)", bgcolor: "rgba(255,255,255,.7)" }}
+                                >
+                                  <ChevronLeftIcon />
+                                </IconButton>
+                                <IconButton
+                                  size="small"
+                                  onClick={() => nextImg(p.id, p.images.length)}
+                                  sx={{ position: "absolute", top: "50%", right: 4, transform: "translateY(-50%)", bgcolor: "rgba(255,255,255,.7)" }}
+                                >
+                                  <ChevronRightIcon />
+                                </IconButton>
+                                <Box sx={{
+                                  position: "absolute", bottom: 4, right: 6,
+                                  bgcolor: "rgba(0,0,0,.6)", color: "#fff",
+                                  px: .75, py: .25, borderRadius: .75, fontSize: 12
+                                }}>
+                                  {(imgIdx[p.id] ?? 0) + 1}/{p.images.length}
+                                </Box>
+                              </>
+                            )}
+                          </Box>
+                        ) : "—"}
+                      </TableCell>
+                      <TableCell align="right">
+                        <Button size="small" onClick={() => onOpenProduct(p)} startIcon={<EditIcon />}>Редагувати</Button>
+                        <Button size="small" color="error" onClick={() => onDeleteProductClick(p)} startIcon={<DeleteIcon />}>Видалити</Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {filteredProducts.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={7} align="center">Немає даних</TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </Paper>
+          )
         )}
 
         {/* модальне вікно додати/редагувати */}
@@ -467,11 +534,3 @@ export default function Product() {
     </Layout>
   );
 }
-
-/** ——— невеличкі безпечні хелпери для посилань/навігації в Tabs ——— */
-import { useNavigate, Link as RouterLinkBase } from "react-router-dom";
-function useNavigateSafe() {
-  // обгортка щоб уникнути лінтера в цьому файлі
-  return useNavigate();
-}
-const RouterLinkSafe = RouterLinkBase;
