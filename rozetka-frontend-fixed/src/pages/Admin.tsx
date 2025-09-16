@@ -1,7 +1,7 @@
 // src/pages/Admin.tsx
 import Layout from "../components/Layout";
-import { useMemo, useState } from "react";
-import { Link as RouterLink } from "react-router-dom";
+import { useMemo, useState, useEffect } from "react";
+import { Link as RouterLink, useNavigate } from "react-router-dom";
 import {
   Container, Typography, Table, TableHead, TableRow, TableCell, TableBody,
   Button, Dialog, DialogTitle, DialogContent, DialogActions,
@@ -21,18 +21,21 @@ type UserRow = {
   phoneNumber?: string;
   dateCreated?: string;
   roles: string[];
-  bannedUntil?: string | null; // фронт-мок
+  bannedUntil?: string | null;
 };
 
 const API = import.meta.env.VITE_API_URL;
 
-// простий декодер JWT (на випадок включення guard’а)
+// простий декодер JWT
 function decodeJwt<T = any>(token: string): T | null {
   try {
     const [, payload] = token.split(".");
     const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
     const json = decodeURIComponent(
-      atob(base64).split("").map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2)).join("")
+      atob(base64)
+        .split("")
+        .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+        .join("")
     );
     return JSON.parse(json);
   } catch {
@@ -42,8 +45,9 @@ function decodeJwt<T = any>(token: string): T | null {
 
 export default function Admin() {
   const token = useMemo(() => localStorage.getItem("token") ?? "", []);
-  const [showUsers, setShowUsers] = useState(false);
+  const navigate = useNavigate();
 
+  const [showUsers, setShowUsers] = useState(false);
   const [users, setUsers] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [userSearch, setUserSearch] = useState("");
@@ -56,44 +60,51 @@ export default function Admin() {
   // Ban (mock)
   const [openBan, setOpenBan] = useState(false);
   const [banUser, setBanUser] = useState<UserRow | null>(null);
-  const [banOption, setBanOption] = useState<"1d"|"7d"|"30d"|"forever"|"until">("7d");
+  const [banOption, setBanOption] = useState<"1d" | "7d" | "30d" | "forever" | "until">("7d");
   const [banDate, setBanDate] = useState<string>("");
 
   // Швидкі дії за ID
   const [userIdInput, setUserIdInput] = useState<string>("");
 
   // notify
-  const [snack, setSnack] = useState<{open: boolean; msg: string; type:"success"|"error"}>({
-    open:false, msg:"", type:"success"
+  const [snack, setSnack] = useState<{ open: boolean; msg: string; type: "success" | "error" }>({
+    open: false,
+    msg: "",
+    type: "success",
   });
 
   // headers
-  const authHeaders: Record<string, string> = {"Content-Type":"application/json"};
+  const authHeaders: Record<string, string> = { "Content-Type": "application/json" };
   if (token) authHeaders.Authorization = `Bearer ${token}`;
 
-  // ===== Guard (залишено закоментованим — увімкнеш коли треба) =====
-  /*
+  // Guard
   useEffect(() => {
-    if (!token) { navigate("/login"); return; }
+    if (!token) {
+      navigate("/login");
+      return;
+    }
     const payload = decodeJwt<{ roles?: string | string[] }>(token);
-    const rolesArr = Array.isArray(payload?.roles) ? payload?.roles : payload?.roles ? [payload.roles] : [];
+    const rolesArr = Array.isArray(payload?.roles)
+      ? payload?.roles
+      : payload?.roles
+      ? [payload.roles]
+      : [];
     if (!rolesArr.includes("Admin")) navigate("/product-search");
   }, [token, navigate]);
-  */
 
   const fetchUsers = async () => {
     try {
       setLoading(true);
       const res = await fetch(`${API}/api/Users/all`, { headers: authHeaders });
       if (res.status === 401 || res.status === 403) {
-        setSnack({open:true, msg:"Немає доступу. Увійдіть як адміністратор.", type:"error"});
+        setSnack({ open: true, msg: "Немає доступу. Увійдіть як адміністратор.", type: "error" });
         return;
       }
       if (!res.ok) throw new Error("Не вдалося завантажити користувачів");
       const data = await res.json();
       setUsers(data);
-    } catch (e:any) {
-      setSnack({open:true, msg:e?.message ?? "Помилка завантаження", type:"error"});
+    } catch (e: any) {
+      setSnack({ open: true, msg: e?.message ?? "Помилка завантаження", type: "error" });
     } finally {
       setLoading(false);
     }
@@ -105,7 +116,7 @@ export default function Admin() {
     if (next) fetchUsers();
   };
 
-  const filteredUsers = users.filter(u => {
+  const filteredUsers = users.filter((u) => {
     const q = userSearch.trim().toLowerCase();
     if (!q) return true;
     return (
@@ -116,105 +127,145 @@ export default function Admin() {
     );
   });
 
-  // role edit (в рядку)
-  const onOpenEdit = (u: UserRow) => { setEditUser(u); setSelectedRole(u.roles?.[0] ?? "User"); setOpenEdit(true); };
+  // role edit
+  const onOpenEdit = (u: UserRow) => {
+    setEditUser(u);
+    setSelectedRole(u.roles?.[0] ?? "User");
+    setOpenEdit(true);
+  };
   const onSaveRole = async () => {
     if (!editUser) return;
     try {
       const res = await fetch(`${API}/api/Users/${editUser.id}/role`, {
-        method: "PUT", headers: authHeaders, body: JSON.stringify({ role: selectedRole })
+        method: "PUT",
+        headers: authHeaders,
+        body: JSON.stringify({ role: selectedRole }),
       });
       if (!res.ok) {
         let msg = "Не вдалося оновити роль";
-        try { const d=await res.json(); if (d?.message) msg=d.message; } catch {}
+        try {
+          const d = await res.json();
+          if (d?.message) msg = d.message;
+        } catch {}
         throw new Error(msg);
       }
-      setSnack({open:true, msg:"Роль оновлено", type:"success"});
-      setOpenEdit(false); setEditUser(null);
+      setSnack({ open: true, msg: "Роль оновлено", type: "success" });
+      setOpenEdit(false);
+      setEditUser(null);
       if (showUsers) fetchUsers();
-    } catch (e:any) {
-      setSnack({open:true, msg:e?.message ?? "Помилка оновлення", type:"error"});
+    } catch (e: any) {
+      setSnack({ open: true, msg: e?.message ?? "Помилка оновлення", type: "error" });
     }
   };
 
-  // delete (в рядку)
+  // delete
   const onDeleteUser = async (u: UserRow) => {
     if (!confirm(`Видалити користувача ${u.email}?`)) return;
     try {
-      const res = await fetch(`${API}/api/Users/${u.id}`, { method: "DELETE", headers: authHeaders });
+      const res = await fetch(`${API}/api/Users/${u.id}`, {
+        method: "DELETE",
+        headers: authHeaders,
+      });
       if (!res.ok) {
         let msg = "Не вдалося видалити";
-        try { const d=await res.json(); if (d?.message) msg=d.message; } catch {}
+        try {
+          const d = await res.json();
+          if (d?.message) msg = d.message;
+        } catch {}
         throw new Error(msg);
       }
-      setSnack({open:true, msg:"Користувача видалено", type:"success"});
-      setUsers(prev => prev.filter(x => x.id !== u.id));
-    } catch (e:any) {
-      setSnack({open:true, msg:e?.message ?? "Помилка видалення", type:"error"});
+      setSnack({ open: true, msg: "Користувача видалено", type: "success" });
+      setUsers((prev) => prev.filter((x) => x.id !== u.id));
+    } catch (e: any) {
+      setSnack({ open: true, msg: e?.message ?? "Помилка видалення", type: "error" });
     }
   };
 
   // ban (front-mock)
-  const onOpenBan = (u: UserRow) => { setBanUser(u); setBanOption("7d"); setBanDate(""); setOpenBan(true); };
+  const onOpenBan = (u: UserRow) => {
+    setBanUser(u);
+    setBanOption("7d");
+    setBanDate("");
+    setOpenBan(true);
+  };
   const calcBanUntil = (): string | null => {
     if (banOption === "forever") return "9999-12-31";
     if (banOption === "until") return banDate || null;
     const days = banOption === "1d" ? 1 : banOption === "7d" ? 7 : 30;
-    const d = new Date(); d.setDate(d.getDate() + days);
-    return d.toISOString().slice(0,10);
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    return d.toISOString().slice(0, 10);
   };
   const onSaveBan = () => {
     if (!banUser) return;
     const until = calcBanUntil();
-    setUsers(prev => prev.map((u) => u.id === banUser.id ? {...u, bannedUntil: until} : u));
-    setSnack({open:true, msg: until ? `Забанено до ${until}` : "Бан знято", type:"success"});
-    setOpenBan(false); setBanUser(null);
+    setUsers((prev) => prev.map((u) => (u.id === banUser.id ? { ...u, bannedUntil: until } : u)));
+    setSnack({ open: true, msg: until ? `Забанено до ${until}` : "Бан знято", type: "success" });
+    setOpenBan(false);
+    setBanUser(null);
   };
 
   // ===== ШВИДКІ ДІЇ ЗА ID =====
-  const [quickRole, setQuickRole] = useState<"User"|"Admin">("User");
+  const [quickRole, setQuickRole] = useState<"User" | "Admin">("User");
 
   const changeRoleById = async () => {
     const id = Number(userIdInput);
-    if (!id) { setSnack({open:true, msg:"Вкажіть коректний ID", type:"error"}); return; }
+    if (!id) {
+      setSnack({ open: true, msg: "Вкажіть коректний ID", type: "error" });
+      return;
+    }
     try {
       const res = await fetch(`${API}/api/Users/${id}/role`, {
-        method: "PUT", headers: authHeaders, body: JSON.stringify({ role: quickRole })
+        method: "PUT",
+        headers: authHeaders,
+        body: JSON.stringify({ role: quickRole }),
       });
       if (!res.ok) {
         let msg = "Не вдалося оновити роль";
-        try { const d = await res.json(); if (d?.message) msg = d.message; } catch {}
+        try {
+          const d = await res.json();
+          if (d?.message) msg = d.message;
+        } catch {}
         throw new Error(msg);
       }
-      setSnack({open:true, msg:`Роль користувача #${id} оновлено`, type:"success"});
+      setSnack({ open: true, msg: `Роль користувача #${id} оновлено`, type: "success" });
       if (showUsers) await fetchUsers();
-    } catch (e:any) {
-      setSnack({open:true, msg:e?.message ?? "Помилка оновлення ролі", type:"error"});
+    } catch (e: any) {
+      setSnack({ open: true, msg: e?.message ?? "Помилка оновлення ролі", type: "error" });
     }
   };
 
   const deleteUserById = async () => {
     const id = Number(userIdInput);
-    if (!id) { setSnack({open:true, msg:"Вкажіть коректний ID", type:"error"}); return; }
+    if (!id) {
+      setSnack({ open: true, msg: "Вкажіть коректний ID", type: "error" });
+      return;
+    }
     if (!confirm(`Видалити користувача #${id}?`)) return;
     try {
       const res = await fetch(`${API}/api/Users/${id}`, { method: "DELETE", headers: authHeaders });
       if (!res.ok) {
         let msg = "Не вдалося видалити";
-        try { const d = await res.json(); if (d?.message) msg = d.message; } catch {}
+        try {
+          const d = await res.json();
+          if (d?.message) msg = d.message;
+        } catch {}
         throw new Error(msg);
       }
-      setSnack({open:true, msg:`Користувача #${id} видалено`, type:"success"});
-      if (showUsers) setUsers(prev => prev.filter(u => u.id !== id));
-    } catch (e:any) {
-      setSnack({open:true, msg:e?.message ?? "Помилка видалення", type:"error"});
+      setSnack({ open: true, msg: `Користувача #${id} видалено`, type: "success" });
+      if (showUsers) setUsers((prev) => prev.filter((u) => u.id !== id));
+    } catch (e: any) {
+      setSnack({ open: true, msg: e?.message ?? "Помилка видалення", type: "error" });
     }
   };
 
   const openBanById = () => {
     const id = Number(userIdInput);
-    if (!id) { setSnack({open:true, msg:"Вкажіть коректний ID", type:"error"}); return; }
-    const u = users.find(x => x.id === id) ?? { id, email: `(ID ${id})`, roles: [] } as UserRow;
+    if (!id) {
+      setSnack({ open: true, msg: "Вкажіть коректний ID", type: "error" });
+      return;
+    }
+    const u = users.find((x) => x.id === id) ?? ({ id, email: `(ID ${id})`, roles: [] } as UserRow);
     onOpenBan(u);
   };
 
@@ -223,26 +274,17 @@ export default function Admin() {
       <Container maxWidth="lg" sx={{ mt: 4, mb: 8 }}>
         <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
           <Typography variant="h5" sx={{ fontWeight: "bold" }}>Користувачі (адмін)</Typography>
-          <Button
-            variant="outlined"
-            component={RouterLink}
-            to="/product"
-            startIcon={<ShoppingCartIcon />}
-          >
+          <Button variant="outlined" component={RouterLink} to="/product" startIcon={<ShoppingCartIcon />}>
             Перейти до товарів
           </Button>
-          <Button
-      variant="outlined"
-      component={RouterLink}
-      to="/categorie"
-      startIcon={<CategoryIcon />}
-    >
-      Перейти до категорій
-    </Button>
+          <Button variant="outlined" component={RouterLink} to="/categorie" startIcon={<CategoryIcon />}>
+            Перейти до категорій
+          </Button>
         </Stack>
-               {/* Верхня панель */}
+
+        {/* Верхня панель */}
         <Stack direction={{ xs: "column", lg: "row" }} gap={2} alignItems="center" sx={{ mb: 2 }}>
-          {/* Ліва зона: показ/сховати + пошук + оновити */}
+          {/* Ліва зона */}
           <Stack direction="row" gap={2} alignItems="center" sx={{ flexWrap: "wrap" }}>
             <Button variant="contained" onClick={handleShowUsers}>
               {showUsers ? "Сховати користувачів" : "Показати користувачів"}
@@ -263,23 +305,22 @@ export default function Admin() {
             )}
           </Stack>
 
-          {/* Права зона: швидкі дії за ID */}
+          {/* Права зона */}
           <Stack direction={{ xs: "column", sm: "row" }} gap={1.5} alignItems="center" sx={{ ml: "auto", flexWrap: "wrap" }}>
             <TextField
               label="ID користувача"
               size="small"
               type="number"
               value={userIdInput}
-              onChange={(e)=>setUserIdInput(e.target.value)}
+              onChange={(e) => setUserIdInput(e.target.value)}
               sx={{ width: 170 }}
             />
             <FormControl size="small" sx={{ minWidth: 140 }}>
               <InputLabel id="role-quick-label">Роль</InputLabel>
               <Select
                 labelId="role-quick-label"
-                label="Роль"
                 value={quickRole}
-                onChange={(e) => setQuickRole(e.target.value as "User"|"Admin")}
+                onChange={(e) => setQuickRole(e.target.value as "User" | "Admin")}
               >
                 <MenuItem value="User">User</MenuItem>
                 <MenuItem value="Admin">Admin</MenuItem>
@@ -300,7 +341,9 @@ export default function Admin() {
         {/* Таблиця користувачів */}
         {showUsers && (
           loading ? (
-            <Box sx={{ display:"flex", justifyContent:"center", py:6 }}><CircularProgress /></Box>
+            <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
+              <CircularProgress />
+            </Box>
           ) : (
             <Table>
               <TableHead>
@@ -350,8 +393,11 @@ export default function Admin() {
             <Typography sx={{ mb: 1 }}>Користувач: <b>{editUser?.email}</b></Typography>
             <FormControl fullWidth>
               <InputLabel id="role-label">Роль</InputLabel>
-              <Select labelId="role-label" label="Роль" value={selectedRole}
-                      onChange={(e) => setSelectedRole(e.target.value as string)}>
+              <Select
+                labelId="role-label"
+                value={selectedRole}
+                onChange={(e) => setSelectedRole(e.target.value as string)}
+              >
                 <MenuItem value="User">User</MenuItem>
                 <MenuItem value="Admin">Admin</MenuItem>
               </Select>
@@ -363,15 +409,18 @@ export default function Admin() {
           </DialogActions>
         </Dialog>
 
-        {/* Ban dialog (mock) */}
+        {/* Ban dialog */}
         <Dialog open={openBan} onClose={() => setOpenBan(false)}>
           <DialogTitle>Забанити користувача</DialogTitle>
           <DialogContent sx={{ pt: 1, width: 420, maxWidth: "100%" }}>
             <Typography sx={{ mb: 1 }}>Користувач: <b>{banUser?.email}</b></Typography>
             <FormControl fullWidth sx={{ mb: 2 }}>
               <InputLabel id="ban-label">Термін</InputLabel>
-              <Select labelId="ban-label" label="Термін" value={banOption}
-                      onChange={(e) => setBanOption(e.target.value as any)}>
+              <Select
+                labelId="ban-label"
+                value={banOption}
+                onChange={(e) => setBanOption(e.target.value as typeof banOption)}
+              >
                 <MenuItem value="1d">1 день</MenuItem>
                 <MenuItem value="7d">7 днів</MenuItem>
                 <MenuItem value="30d">30 днів</MenuItem>
@@ -381,9 +430,12 @@ export default function Admin() {
             </FormControl>
             {banOption === "until" && (
               <TextField
-                label="Дата (YYYY-MM-DD)" type="date" fullWidth
+                label="Дата (YYYY-MM-DD)"
+                type="date"
+                fullWidth
                 InputLabelProps={{ shrink: true }}
-                value={banDate} onChange={(e) => setBanDate(e.target.value)}
+                value={banDate}
+                onChange={(e) => setBanDate(e.target.value)}
               />
             )}
             <Typography variant="body2" sx={{ mt: 1.5, color: "text.secondary" }}>
@@ -396,9 +448,9 @@ export default function Admin() {
           </DialogActions>
         </Dialog>
 
-        <Snackbar open={snack.open} autoHideDuration={2500}
-                  onClose={() => setSnack(s => ({...s, open:false}))}>
-          <Alert severity={snack.type} onClose={() => setSnack(s => ({...s, open:false}))}>
+        {/* Snackbar */}
+        <Snackbar open={snack.open} autoHideDuration={2500} onClose={() => setSnack(s => ({ ...s, open: false }))}>
+          <Alert severity={snack.type} onClose={() => setSnack(s => ({ ...s, open: false }))}>
             {snack.msg}
           </Alert>
         </Snackbar>

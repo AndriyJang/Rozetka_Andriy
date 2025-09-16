@@ -21,8 +21,7 @@ export default function App() {
       <Route path="/product-search" element={<ProductSearch />} />
       <Route path="/new-password" element={<NewPassword />} />
       <Route path="/admin" element={<Admin />} />
-      <Route path="/product" element={<Product />} />
-      <Route path="/product" element={<Product />} />
+      <Route path="/product" element={<Product />} />      
       <Route path="/categorie" element={<Categorie />} />
       <Route path="/oauth-callback" element={<OAuthCallback />} />
       {/* 404 */}
