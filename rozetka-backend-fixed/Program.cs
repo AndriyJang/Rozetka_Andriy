@@ -21,6 +21,7 @@ using System;
 using System.IO;
 using System.Security.Claims;
 using System.Text;
+using rozetkabackend.Seeder;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -83,6 +84,7 @@ builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
 builder.Services.AddScoped<IImageService, ImageService>();
 builder.Services.AddScoped<ICategoryService, CategoryService>();
 builder.Services.AddScoped<IProductService, ProductService>();
+builder.Services.AddScoped<ProductSeeder>(); // ← потрібен для app.SeedData()
 
 builder.Services.AddControllers();
 
