@@ -16,6 +16,8 @@ public class ProductCreateModel
     /// <summary>
     /// List of uploaded image files for the product.
     /// </summary>
-    [BindProperty(Name = "imageFiles[]")]
+    //[BindProperty(Name = "imageFiles[]")]
+    //public List<IFormFile>? ImageFiles { get; set; }
+    [FromForm(Name = "imageFiles")] 
     public List<IFormFile>? ImageFiles { get; set; }
 }

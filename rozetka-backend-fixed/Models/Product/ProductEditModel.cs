@@ -16,6 +16,12 @@ public class ProductEditModel
     /// <summary>
     /// List of uploaded image files for the product.
     /// </summary>
-    [BindProperty(Name = "imageFiles[]")]
+    //[BindProperty(Name = "imageFiles[]")]
+    //public List<IFormFile>? ImageFiles { get; set; }
+    [FromForm(Name = "imageFiles")] 
     public List<IFormFile>? ImageFiles { get; set; }
+
+    // CSV базових імен файлів у НОВОМУ порядку; те, чого тут немає — видалимо
+    [FromForm(Name = "keepImageNames")]
+    public string? KeepImageNames { get; set; }
 }

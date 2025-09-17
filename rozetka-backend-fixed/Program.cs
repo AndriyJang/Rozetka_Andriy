@@ -1,69 +1,67 @@
-﻿using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.Authentication.Google;    // ← для GoogleDefaults
+﻿using System;
+using System.IO;
+using System.Text;
+using System.Security.Claims;
+
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
-using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
-using Microsoft.OpenApi.Models;
+
 using RozetkaApi.Data;
-using rozetkabackend;
 using rozetkabackend.Entities.Identity;
 using rozetkabackend.Interfaces;
 using rozetkabackend.Services;
-using System;
-using System.IO;
-using System.Security.Claims;
-using System.Text;
-using rozetkabackend.Seeder;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Додаємо CORS політику
+// URLs
 builder.WebHost.UseUrls("http://localhost:5000", "https://localhost:5001");
 
-builder.Services.AddCors(options =>
+// CORS
+builder.Services.AddCors(o =>
 {
-    options.AddPolicy("AllowFrontend",
-        policy =>
-        {
-            policy.WithOrigins("http://localhost:5173", "https://localhost:5173")
-                  .AllowAnyHeader()
-                  .AllowAnyMethod();
-        });
+    o.AddPolicy("AllowFrontend", p =>
+        p.WithOrigins("http://localhost:5173", "https://localhost:5173")
+         .AllowAnyHeader()
+         .AllowAnyMethod());
 });
 
-// 🟢 Підключення до PostgreSQL через AppDbContext
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+// DB
+builder.Services.AddDbContext<AppDbContext>(opt =>
+    opt.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-builder.Services.AddIdentity<UserEntity, RoleEntity>(options =>
+// Identity
+builder.Services.AddIdentity<UserEntity, RoleEntity>(opt =>
 {
-    options.Password.RequireDigit = false;
-    options.Password.RequireLowercase = false;
-    options.Password.RequireUppercase = false;
-    options.Password.RequiredLength = 8;
-    options.Password.RequireNonAlphanumeric = false;
+    opt.Password.RequireDigit = false;
+    opt.Password.RequireLowercase = false;
+    opt.Password.RequireUppercase = false;
+    opt.Password.RequiredLength = 8;
+    opt.Password.RequireNonAlphanumeric = false;
 })
-            .AddEntityFrameworkStores<AppDbContext>()
-            .AddDefaultTokenProviders();
+.AddEntityFrameworkStores<AppDbContext>()
+.AddDefaultTokenProviders();
 
-builder.Services.AddAuthentication(options =>
+// JWT
+builder.Services.AddAuthentication(o =>
 {
-    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    o.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    o.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
 })
-.AddJwtBearer(options =>
+.AddJwtBearer(o =>
 {
-    options.RequireHttpsMetadata = false;
-    options.SaveToken = true;
-    options.TokenValidationParameters = new TokenValidationParameters
+    o.RequireHttpsMetadata = false;
+    o.SaveToken = true;
+    o.TokenValidationParameters = new TokenValidationParameters
     {
         ValidateIssuer = false,
         ValidateAudience = false,
@@ -71,33 +69,31 @@ builder.Services.AddAuthentication(options =>
         ValidateLifetime = true,
         ClockSkew = TimeSpan.Zero,
         IssuerSigningKey = new SymmetricSecurityKey(
-            Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"])),
-
-        // ось це важливо
+            Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"] ?? "dev-secret-change-me")),
         RoleClaimType = ClaimTypes.Role,
         NameClaimType = ClaimTypes.Name
     };
 });
 
+builder.Services.AddAuthorization();
 
+// DI
 builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
 builder.Services.AddScoped<IImageService, ImageService>();
 builder.Services.AddScoped<ICategoryService, CategoryService>();
 builder.Services.AddScoped<IProductService, ProductService>();
-builder.Services.AddScoped<ProductSeeder>(); // ← потрібен для app.SeedData()
+builder.Services.AddScoped<rozetkabackend.Seeder.ProductSeeder>();
 
 builder.Services.AddControllers();
-
 builder.Services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
 
-
+// Swagger
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo { Title = "rozetkabackend", Version = "v1" });
 
-    // 🔐 JWT Bearer security-scheme (щоб з’явилася кнопка Authorize)
-    var jwtScheme = new OpenApiSecurityScheme
+    var jwt = new OpenApiSecurityScheme
     {
         Name = "Authorization",
         Description = "Введіть: Bearer {JWT}",
@@ -105,23 +101,31 @@ builder.Services.AddSwaggerGen(c =>
         Type = SecuritySchemeType.Http,
         Scheme = "bearer",
         BearerFormat = "JWT",
-        Reference = new OpenApiReference
-        {
-            Type = ReferenceType.SecurityScheme,
-            Id = "Bearer"
-        }
+        Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" }
     };
-
-    c.AddSecurityDefinition("Bearer", jwtScheme);
-    c.AddSecurityRequirement(new OpenApiSecurityRequirement
-    {
-        { jwtScheme, Array.Empty<string>() }
-    });
+    c.AddSecurityDefinition("Bearer", jwt);
+    c.AddSecurityRequirement(new OpenApiSecurityRequirement { { jwt, Array.Empty<string>() } });
 });
 
 var app = builder.Build();
 
-// 👇 ВАЖЛИВО: UseCors має бути ДО UseHttpsRedirection
+// ====== Static files (/images) — ПЕРЕД маршрутизацією! ======
+var dir = builder.Configuration["ImagesDir"] ?? "images";
+var root = AppContext.BaseDirectory;                    
+var path = Path.Combine(root, dir);
+Directory.CreateDirectory(path);
+
+var provider = new FileExtensionContentTypeProvider();
+provider.Mappings[".webp"] = "image/webp";
+
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(path),
+    RequestPath = "/" + dir.Trim('/'),
+    ContentTypeProvider = provider
+});
+
+// pipeline
 app.UseCors("AllowFrontend");
 
 if (app.Environment.IsDevelopment())
@@ -135,21 +139,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
-
-var dir = builder.Configuration["ImagesDir"];
-string path = Path.Combine(Directory.GetCurrentDirectory(), dir);
-Directory.CreateDirectory(path);
-
-app.UseStaticFiles(new StaticFileOptions
-{
-    FileProvider = new PhysicalFileProvider(path),
-    RequestPath = $"/{dir}"
-});
-
-// 1) Базовий сидер (ролі/юзери/категорії)
 await rozetkabackend.DbSeeder.SeedData(app);
-
-// 2) Продуктовий сидер (досісти до 50 шт)
 await rozetkabackend.Seeder.SeedExtensions.SeedData(app, 50);
 
 app.Run();

@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using RozetkaApi.Data;
-using RozetkaApi.Helpers;
+using rozetkabackend.Seeder;
 using rozetkabackend.Constants;
 using rozetkabackend.Data.Entities.Catalog;
 using rozetkabackend.Entities.Identity;
