@@ -1,3 +1,4 @@
+// src/pages/Product.tsx
 import Layout from "../components/Layout";
 import { useMemo, useState, useEffect } from "react";
 import {
@@ -20,7 +21,7 @@ type ProductRow = {
   price: number;
   categoryId: number;
   description: string;
-  images: string[];        // лише базові імена: aaa.webp
+  images: string[];        // лише базові імена: abc.webp
   inStock: boolean;
   brand?: string;
   brandSite?: string;
@@ -30,30 +31,32 @@ type ProductRow = {
 };
 type ApiProductImage = { id: number; name: string; priority: number };
 
-const API = import.meta.env.VITE_API_URL as string;
+// — API base (прибираємо зайві “/” наприкінці)
+const RAW_API = import.meta.env.VITE_API_URL || "";
+const API = RAW_API.replace(/\/+$/, "");
 const IMAGES_BASE = `${API}/images`;
 
-// Побудова URL для multi-size WEBP (200_, 800_, 0_)
+// URL для multi-size WEBP (200_, 800_, 0_)
 const imgUrl = (name?: string, size: number = 200) =>
   name ? `${IMAGES_BASE}/${size}_${name}` : "";
 
-// Нормалізація будь-якого вводу до базового імені (без шляху і префіксів розміру)
+// Нормалізація до базового імені (без шляху та префікса розміру)
 const toBaseName = (val?: string): string => {
   let v = String(val ?? "").trim();
   if (!v) return "";
-  v = v.replace(/^https?:\/\/[^/]+/i, ""); // прибрати origin
+  v = v.replace(/^https?:\/\/[^/]+/i, "");
   v = v.replace(/^\/+/, "");
   if (v.startsWith("images/")) v = v.slice(7);
   v = (v.split("/").pop() ?? v);
-  v = v.replace(/^\d+_/, ""); // прибрати 200_ / 800_ / 0_
+  v = v.replace(/^\d+_/, "");
   return v;
 };
 
-/** ===== REST-ендпоінти (відповідають твоєму ProductsController) ===== **/
+/** ===== Ендпоінти, як у контролері ===== **/
 const PRODUCTS_LIST = `${API}/api/Products`;
-const PRODUCT_GET_ID = (id: number) => `${API}/api/Products/id/${id}`; // було без /id/
-const PRODUCT_CREATE = `${API}/api/Products/create`;                    // було без /create
-const PRODUCT_EDIT = `${API}/api/Products/edit`;                        // було /Products/{id}
+const PRODUCT_GET_ID = (id: number) => `${API}/api/Products/${id}`;
+const PRODUCT_CREATE = `${API}/api/Products`;
+const PRODUCT_EDIT = (id: number) => `${API}/api/Products/${id}`;
 const PRODUCT_DELETE = (id: number) => `${API}/api/Products/${id}`;
 
 function slugify(input: string): string {
@@ -68,7 +71,7 @@ function slugify(input: string): string {
   return normalized.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").replace(/--+/g, "-");
 }
 
-// Приведення даних з API до ProductRow + нормалізація імен фото
+// API → ProductRow
 const mapFromApi = (x: any): ProductRow => {
   const imgs: ApiProductImage[] = Array.isArray(x?.productImages) ? x.productImages : [];
   const ordered = imgs.slice().sort((a, b) => a.priority - b.priority);
@@ -89,11 +92,14 @@ export default function Product() {
   const navigate = useNavigate();
   const location = useLocation();
 
+  const authHeaders: Record<string, string> = {};
+  if (token) authHeaders.Authorization = `Bearer ${token}`;
+
   const [showList, setShowList] = useState(false);
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
-  const [imgVer, setImgVer] = useState(1); // кеш-бастинг зображень
+  const [imgVer, setImgVer] = useState(1);
 
   const [openProduct, setOpenProduct] = useState(false);
   const [editProduct, setEditProduct] = useState<ProductRow | null>(null);
@@ -103,9 +109,10 @@ export default function Product() {
   const [price, setPrice] = useState<number>(0);
   const [categoryId, setCategoryId] = useState<number>(0);
   const [description, setDescription] = useState("");
-  const [existingImageNames, setExistingImageNames] = useState<string>(""); // CSV базових імен
+  const [existingImageNames, setExistingImageNames] = useState<string>("");
   const [newFiles, setNewFiles] = useState<File[]>([]);
 
+  // додаткові фронт-поля
   const [inStock, setInStock] = useState(true);
   const [brand, setBrand] = useState("");
   const [brandSite, setBrandSite] = useState("");
@@ -119,9 +126,7 @@ export default function Product() {
     { open:false, msg:"", type:"success" }
   );
 
-  const authHeadersOnlyAuth: Record<string, string> = {};
-  if (token) authHeadersOnlyAuth.Authorization = `Bearer ${token}`;
-
+  // активний індекс фото по productId
   const [photoIndex, setPhotoIndex] = useState<Record<number, number>>({});
   const nextPhoto = (id: number, total: number) =>
     setPhotoIndex(prev => ({ ...prev, [id]: ((prev[id] ?? 0) + 1) % Math.max(1, total) }));
@@ -131,11 +136,22 @@ export default function Product() {
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      const res = await fetch(PRODUCTS_LIST);
-      if (!res.ok) throw new Error("Не вдалося завантажити товари");
+      const res = await fetch(PRODUCTS_LIST, { headers: authHeaders });
+      if (!res.ok) throw new Error(`Не вдалося завантажити товари (HTTP ${res.status})`);
       const data = await res.json();
       const rows: ProductRow[] = Array.isArray(data) ? data.map(mapFromApi) : [];
       setProducts(rows);
+
+      // 🛠 КЛЮЧОВЕ: клемп індексів після будь-якої зміни списку/фото
+      setPhotoIndex(prev => {
+        const next: Record<number, number> = {};
+        for (const p of rows) {
+          const cur = prev[p.id] ?? 0;
+          const len = p.images.length;
+          next[p.id] = len === 0 ? 0 : Math.min(cur, len - 1);
+        }
+        return next;
+      });
     } catch (e:any) {
       setSnack({open:true, msg:e?.message ?? "Помилка завантаження", type:"error"});
     } finally { setLoading(false); }
@@ -159,7 +175,7 @@ export default function Product() {
       setEditProduct(p);
       setName(p.name); setSlug(p.slug || slugify(p.name)); setPrice(p.price);
       setCategoryId(p.categoryId); setDescription(p.description ?? "");
-      setExistingImageNames((p.images ?? []).map(toBaseName).join(",")); // тільки базові імена
+      setExistingImageNames((p.images ?? []).map(toBaseName).join(","));
       setNewFiles([]);
     } else { setEditProduct(null); resetForm(); }
     setOpenProduct(true);
@@ -174,9 +190,9 @@ export default function Product() {
     fd.append("price", String(price));
     fd.append("categoryId", String(categoryId));
     fd.append("description", description ?? "");
-    for (const f of newFiles) fd.append("imageFiles", f); // ключ має бути саме imageFiles
+    for (const f of newFiles) fd.append("imageFiles", f);
 
-    const res = await fetch(PRODUCT_CREATE, { method: "POST", headers: authHeadersOnlyAuth, body: fd });
+    const res = await fetch(PRODUCT_CREATE, { method: "POST", headers: authHeaders, body: fd });
     if (!res.ok) {
       let msg = "Не вдалося створити товар";
       try { const d = await res.json(); if (d?.message) msg = d.message; } catch {}
@@ -189,10 +205,7 @@ export default function Product() {
 
   const updateProduct = async (id: number) => {
     const keepNames = Array.from(new Set(
-      existingImageNames
-        .split(",")
-        .map(s => toBaseName(s))
-        .filter(Boolean)
+      existingImageNames.split(",").map(s => toBaseName(s)).map(s => s.trim()).filter(Boolean)
     ));
 
     if (keepNames.length === 0 && newFiles.length === 0) {
@@ -200,16 +213,15 @@ export default function Product() {
     }
 
     const fd = new FormData();
-    fd.append("id", String(id)); // ОБОВʼЯЗКОВО для PUT /api/Products/edit
     fd.append("name", name.trim());
     fd.append("slug", (slug.trim() || slugify(name)));
     fd.append("price", String(price));
     fd.append("categoryId", String(categoryId));
     fd.append("description", description ?? "");
-    fd.append("keepImageNames", keepNames.join(",")); // список, що залишаємо у НОВОМУ порядку
-    for (const f of newFiles) fd.append("imageFiles", f); // нові файли
+    fd.append("keepImageNames", keepNames.join(","));
+    for (const f of newFiles) fd.append("imageFiles", f);
 
-    const res = await fetch(PRODUCT_EDIT, { method: "PUT", headers: authHeadersOnlyAuth, body: fd });
+    const res = await fetch(PRODUCT_EDIT(id), { method: "PUT", headers: authHeaders, body: fd });
     if (!res.ok) {
       let msg = "Не вдалося оновити товар (перевірте фото)";
       try { const d = await res.json(); if (d?.message) msg = d.message; } catch {}
@@ -221,7 +233,7 @@ export default function Product() {
   };
 
   const deleteProduct = async (id: number) => {
-    const res = await fetch(PRODUCT_DELETE(id), { method:"DELETE", headers: authHeadersOnlyAuth });
+    const res = await fetch(PRODUCT_DELETE(id), { method:"DELETE", headers: authHeaders });
     if (!res.ok) {
       let msg = "Не вдалося видалити товар";
       try { const d=await res.json(); if (d?.message) msg=d.message; } catch {}
@@ -253,7 +265,7 @@ export default function Product() {
     const id = Number(productIdInput);
     if (!id) { setSnack({open:true, msg:"Вкажіть коректний ID", type:"error"}); return; }
     try {
-      const res = await fetch(PRODUCT_GET_ID(id), { headers: authHeadersOnlyAuth });
+      const res = await fetch(PRODUCT_GET_ID(id), { headers: authHeaders });
       if (res.ok) {
         const one = mapFromApi(await res.json());
         setEditProduct(one);
@@ -268,6 +280,7 @@ export default function Product() {
     setEditProduct({ id, name:"", slug:"", price:0, categoryId:0, description:"", images:[], inStock:true, brand:"", brandSite:"", size:"", color:"", year:"" });
     setName(""); setSlug(""); setPrice(0); setCategoryId(0); setDescription(""); setExistingImageNames(""); setNewFiles([]); setOpenProduct(true);
   };
+
   const deleteById = async () => {
     const id = Number(productIdInput);
     if (!id) { setSnack({open:true, msg:"Вкажіть коректний ID", type:"error"}); return; }
@@ -276,8 +289,8 @@ export default function Product() {
     catch (e:any) { setSnack({open:true, msg:e?.message ?? "Помилка видалення", type:"error"}); }
   };
 
+  // — Меню/автентифікація —
   const logout = () => { localStorage.removeItem("token"); localStorage.removeItem("roles"); navigate("/login"); };
-
   const isActive = (path: string) => location.pathname.startsWith(path);
   const grad = (active: boolean) => active
     ? "linear-gradient(90deg, #0E5B8A 0%, #0FA6A6 100%)"
@@ -366,7 +379,7 @@ export default function Product() {
                 <TableBody>
                   {filteredProducts.map((p) => {
                     const total = p.images?.length ?? 0;
-                    const idx = photoIndex[p.id] ?? 0;
+                    const idx = Math.min(photoIndex[p.id] ?? 0, Math.max(0, total - 1)); // підрізання на всяк випадок
                     const base = total > 0 ? p.images[idx] : null;
                     const src = base ? `${imgUrl(base, 200)}?v=${imgVer}` : "";
                     return (
@@ -376,6 +389,7 @@ export default function Product() {
                             <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                               <IconButton size="small" onClick={() => prevPhoto(p.id, total)} disabled={total <= 1}><ChevronLeftIcon /></IconButton>
                               <img
+                                key={base + ":" + imgVer}
                                 src={src}
                                 alt={p.name}
                                 width={72}
@@ -447,6 +461,7 @@ export default function Product() {
                 </Typography>
               )}
 
+              {/* додаткові фронт-поля (не відправляємо на бек) */}
               <FormControlLabel control={<Checkbox checked={inStock} onChange={(e)=>setInStock(e.target.checked)} />} label="В наявності (фронт)" />
               <Stack direction={{ xs:"column", sm:"row" }} gap={2}>
                 <TextField label="Виробник (фронт)" value={brand} onChange={(e)=>setBrand(e.target.value)} fullWidth/>

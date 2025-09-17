@@ -28,6 +28,7 @@ public class ProductSeeder
 
     public async Task SeedAsync(int targetCount)
     {
+        // Категорії
         var categories = _db.Categories.Where(c => !c.IsDeleted).ToList();
         if (categories.Count == 0)
         {
@@ -37,16 +38,11 @@ public class ProductSeeder
             categories = new() { fallback };
         }
 
-        // Набір демо-URL'ів (можеш замінити своїми)
-        var imageUrls = new[]
-        {
-            "https://images.unsplash.com/photo-1517336714731-489689fd1ca8",
-            "https://images.unsplash.com/photo-1512496015851-a90fb38ba796",
-            "https://images.unsplash.com/photo-1510557880182-3d4d3cba35fb",
-            "https://images.unsplash.com/photo-1505740420928-5e560c06d30e",
-            "https://images.unsplash.com/photo-1526178610970-3e7a0c8d4b52",
-            "https://images.unsplash.com/photo-1542291026-7eec264c27ff"
-        };
+        // Генератор стабільних URLів (1600x1200). Для різноманітності — різні "seed".
+        string Picsum(string seed) => $"https://picsum.photos/seed/{Uri.EscapeDataString(seed)}/1600/1200.jpg";
+        string Placeholder(string seed) => $"https://placehold.co/1600x1200/png?text={Uri.EscapeDataString(seed)}";
+
+        var tags = new[] { "laptop", "headphones", "phone", "watch", "camera", "monitor", "tv", "speaker", "ssd", "router" };
 
         var rnd = new Random();
         var have = _db.Products.Count(p => !p.IsDeleted);
@@ -73,21 +69,44 @@ public class ProductSeeder
 
             short pr = 0;
             var photosCount = rnd.Next(1, 4);
-            foreach (var url in imageUrls.OrderBy(_ => rnd.Next()).Take(photosCount))
+
+            foreach (var tag in tags.OrderBy(_ => rnd.Next()).Take(photosCount))
             {
+                var seed = $"{tag}-{Guid.NewGuid():N}".Substring(0, 18);
+
+                // 1-ша спроба — picsum
+                var url = Picsum(seed);
+
                 try
                 {
                     var baseName = await _imageService.SaveImageFromUrlAsync(url);
                     _db.ProductImages.Add(new ProductImageEntity
                     {
                         ProductId = p.Id,
-                        Name = baseName,   // ← базове ім’я типу abcd.webp (без префіксів)
+                        Name = baseName, // базове ім’я *.webp (без 200_/0_)
                         Priority = pr++
                     });
                 }
-                catch (Exception ex)
+                catch (Exception ex1)
                 {
-                    _logger.LogWarning(ex, "Seed image failed: {Url}", url);
+                    _logger.LogWarning(ex1, "Seed image failed (picsum): {Url}", url);
+
+                    // fallback — placehold.co (завжди 200)
+                    var fallbackUrl = Placeholder(seed);
+                    try
+                    {
+                        var baseName = await _imageService.SaveImageFromUrlAsync(fallbackUrl);
+                        _db.ProductImages.Add(new ProductImageEntity
+                        {
+                            ProductId = p.Id,
+                            Name = baseName,
+                            Priority = pr++
+                        });
+                    }
+                    catch (Exception ex2)
+                    {
+                        _logger.LogWarning(ex2, "Seed image failed (fallback): {Url}", fallbackUrl);
+                    }
                 }
             }
 
@@ -98,9 +117,7 @@ public class ProductSeeder
     private static string Slugify(string input)
     {
         if (string.IsNullOrWhiteSpace(input)) return "";
-        var s = input
-            .Normalize(NormalizationForm.FormD)
-            .ToLowerInvariant();
+        var s = input.Normalize(NormalizationForm.FormD).ToLowerInvariant();
         s = System.Text.RegularExpressions.Regex.Replace(s, @"[^a-z0-9]+", "-").Trim('-');
         s = System.Text.RegularExpressions.Regex.Replace(s, @"-+", "-");
         return s;
