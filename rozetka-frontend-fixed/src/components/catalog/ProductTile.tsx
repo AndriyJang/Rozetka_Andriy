@@ -1,8 +1,9 @@
 // src/components/catalog/ProductTile.tsx
 import {
-  Card, CardContent, CardActions, Typography, Button, Box, Collapse, Stack,
+  Card, CardContent, CardActions, Typography, Button, Box, Stack, IconButton,
 } from "@mui/material";
 import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
+import CloseIcon from "@mui/icons-material/Close";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import { Link as RouterLink } from "react-router-dom";
@@ -85,100 +86,82 @@ export default function ProductTile({ p }: { p: ProductDto }) {
   };
 
   return (
-    <Card
-      variant="outlined"
-      sx={{
-        borderRadius: 3,
-        height: "100%",
-        display: "flex",
-        flexDirection: "column",
-        overflow: "hidden",
-      }}
-    >
-      {/* зображення */}
-      <Box
-        component={RouterLink}
-        to={`/product/${p.id}`}
+    // ОБГОРТКА: дозволяє виходити за межі ґрід-комірки без зсуву макета
+    <Box sx={{ position: "relative", overflow: "visible" }}>
+      <Card
+        variant="outlined"
         sx={{
+          borderRadius: 3,
+          height: "100%",
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden", // базова картка не зростає
           position: "relative",
-          display: "block",
-          bgcolor: "#fff",
-          height: 240,
-          borderBottom: "1px solid rgba(2,56,84,0.08)",
+          zIndex: openMore ? 11 : 1, // трохи підняти при відкритті (на випадок перекриття)
         }}
       >
-        {src ? (
-          <Box
-            component="img"
-            src={src}
-            alt={title}
-            sx={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
-            onError={onImgError}
-          />
-        ) : (
-          <Box sx={{ width: "100%", height: "100%", bgcolor: "#f5f7f9" }} />
-        )}
-      </Box>
-
-      <CardContent sx={{ flexGrow: 1 }}>
-        <Typography
+        {/* зображення */}
+        <Box
           component={RouterLink}
           to={`/product/${p.id}`}
-          variant="subtitle1"
           sx={{
-            textDecoration: "none",
-            color: "#023854",
-            fontWeight: 600,
+            position: "relative",
             display: "block",
-            minHeight: 48,
+            bgcolor: "#fff",
+            height: 240,
+            borderBottom: "1px solid rgba(2,56,84,0.08)",
           }}
-          title={title}
         >
-          {title}
-        </Typography>
-
-        <Typography variant="h6" sx={{ mt: 1, color: "#023854", fontWeight: 700 }}>
-          {Number(p.price).toLocaleString("uk-UA")}₴
-        </Typography>
-
-        {/* “Більше” — ЗАВЖДИ */}
-        <Box sx={{ mt: 1 }}>
-          <Button
-            size="small"
-            sx={{ textTransform: "none", px: 1 }}
-            endIcon={openMore ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-            onClick={() => setOpenMore((s) => !s)}
-          >
-            Більше
-          </Button>
+          {src ? (
+            <Box
+              component="img"
+              src={src}
+              alt={title}
+              sx={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
+              onError={onImgError}
+            />
+          ) : (
+            <Box sx={{ width: "100%", height: "100%", bgcolor: "#f5f7f9" }} />
+          )}
         </Box>
 
-        <Collapse in={openMore} unmountOnExit>
-          <Stack spacing={0.5} sx={{ mt: 1 }}>
-            <Typography variant="body2" color="text.secondary">
-              <strong>Виробник:</strong> {showVal(p.brand)}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              <strong>Сайт виробника:</strong> {showVal(p.brandSite)}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              <strong>Розмір:</strong> {showVal(p.size)}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              <strong>Колір:</strong> {showVal(p.color)}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              <strong>Рік:</strong> {showVal(p.year)}
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-              {showVal(p.description)}
-            </Typography>
-          </Stack>
-        </Collapse>
-      </CardContent>
+        <CardContent sx={{ flexGrow: 1 }}>
+          <Typography
+            component={RouterLink}
+            to={`/product/${p.id}`}
+            variant="subtitle1"
+            sx={{
+              textDecoration: "none",
+              color: "#023854",
+              fontWeight: 600,
+              display: "block",
+              minHeight: 48,
+            }}
+            title={title}
+          >
+            {title}
+          </Typography>
 
-      <CardActions sx={{ p: 2, pt: 0, justifyContent: "center" }}>
-        
+          <Typography variant="h6" sx={{ mt: 1, color: "#023854", fontWeight: 700 }}>
+            {Number(p.price).toLocaleString("uk-UA")}₴
+          </Typography>
+
+          {/* “Більше” — кнопка, що відкриває overlay, не змінюючи висоту картки */}
+          <Box sx={{ mt: 1 }}>
+            <Button
+              size="small"
+              sx={{ textTransform: "none", px: 1 }}
+              endIcon={openMore ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpenMore((s) => !s); }}
+              aria-expanded={openMore ? "true" : undefined}
+              aria-haspopup="dialog"
+            >
+              Більше
+            </Button>
+          </Box>
+        </CardContent>
+
+        <CardActions sx={{ p: 2, pt: 0, justifyContent: "center" }}>
           <Button
             onClick={addToCart}
             variant="contained"
@@ -193,8 +176,97 @@ export default function ProductTile({ p }: { p: ProductDto }) {
           >
             Додати в кошик
           </Button>
-       
-      </CardActions>
-    </Card>
+        </CardActions>
+      </Card>
+
+      {/* OVERLAY: розширена картка поверх сітки, з власним скролом */}
+      {openMore && (
+        <Box
+          role="dialog"
+          aria-label={`Деталі товару ${title}`}
+          sx={{
+            position: "absolute",
+            // трішки більша за базову картку
+            top: -12,
+            left: -12,
+            right: -12,
+            // можна також збільшити вниз, але не чіпаємо нижні елементи макета
+            zIndex: 20,
+            borderRadius: 3,
+            bgcolor: "#fff",
+            boxShadow: 12,
+            border: "1px solid rgba(2,56,84,0.12)",
+            maxHeight: "70vh",
+            overflow: "auto", // власний скрол усередині розширеної картки
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* верхня шапка overlay */}
+          <Box sx={{ display: "flex", alignItems: "center", p: 1.5, pb: 1 }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 700, color: "#023854", flex: 1 }}>
+              {title}
+            </Typography>
+            <IconButton
+              size="small"
+              onClick={() => setOpenMore(false)}
+              aria-label="Закрити деталі"
+            >
+              <CloseIcon fontSize="small" />
+            </IconButton>
+          </Box>
+
+          {/* контент overlay */}
+          <Box sx={{ px: 2, pb: 2 }}>
+            {/* можна повторити превʼю зображення компактно */}
+            {!!src && (
+              <Box sx={{ mb: 1.5, display: "grid", placeItems: "center" }}>
+                <Box
+                  component="img"
+                  src={src}
+                  alt={title}
+                  sx={{ width: "100%", maxWidth: 360, height: "auto", objectFit: "contain" }}
+                  onError={onImgError}
+                />
+              </Box>
+            )}
+
+            <Stack spacing={0.5}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5 }}>
+                Характеристики
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                <strong>Виробник:</strong> {showVal(p.brand)}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                <strong>Сайт виробника:</strong> {showVal(p.brandSite)}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                <strong>Розмір:</strong> {showVal(p.size)}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                <strong>Колір:</strong> {showVal(p.color)}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                <strong>Рік:</strong> {showVal(p.year)}
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                {showVal(p.description)}
+              </Typography>
+            </Stack>
+
+            {/* нижня панель overlay (за бажанням) */}
+            <Box sx={{ pt: 2, textAlign: "right" }}>
+              <Button
+                size="small"
+                onClick={() => setOpenMore(false)}
+                startIcon={<CloseIcon fontSize="small" />}
+              >
+                Закрити
+              </Button>
+            </Box>
+          </Box>
+        </Box>
+      )}
+    </Box>
   );
 }

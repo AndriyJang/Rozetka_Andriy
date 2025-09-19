@@ -6,10 +6,11 @@ import {
   Box, Button, TextField, Typography, Link,
   Alert, CircularProgress
 } from "@mui/material";
-import { useGoogleLogin } from '@react-oauth/google';
+import { useGoogleLogin } from "@react-oauth/google";
 
-const LOGIN_ENDPOINT = "/api/Account/Login"; // ← бекенд
-const passwordRegex = /^(?=.*\d)(?!\d)[a-z0-9]{8}$/; // 8 символів, малі латинські + цифри, цифра не перша
+const LOGIN_ENDPOINT = "/api/Account/Login"; // бекенд
+// 8 символів, малі латинські + цифри, цифра не перша:
+const passwordRegex = /^(?=.*\d)(?!\d)[a-z0-9]{8}$/;
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // Примітивний декодер JWT (без залежностей)
@@ -31,7 +32,7 @@ function decodeJwt<T = any>(token: string): T | null {
 
 export default function Login() {
   const navigate = useNavigate();
-  const apiUrl = import.meta.env.VITE_API_URL;
+  const apiUrl = import.meta.env.VITE_API_URL || "";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -39,8 +40,9 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null);
 
   const loginbygoogle = useGoogleLogin({
-  onSuccess: tokenResponse => console.log(tokenResponse),
-});
+    onSuccess: (tokenResponse) => console.log(tokenResponse),
+  });
+
   const validate = () => {
     if (!emailRegex.test(email)) return "Невірний формат ел. пошти.";
     if (!passwordRegex.test(password)) {
@@ -86,22 +88,36 @@ export default function Login() {
 
       localStorage.setItem("token", token);
 
-      // ✓ Декодуємо токен, дістаємо ролі
-      const payload = decodeJwt<{ roles?: string | string[]; role?: string | string[] }>(token);
-      const raw =
-        (Array.isArray(payload?.roles) ? payload?.roles : payload?.roles ? [payload?.roles] : []) as string[];
-      const raw2 =
-        (Array.isArray(payload?.role) ? payload?.role : payload?.role ? [payload?.role] : []) as string[];
-      const roles = [...raw, ...raw2].map(r => String(r));
+      // Декодуємо токен, дістаємо ролі / бан
+      const payload = decodeJwt<{
+        roles?: string | string[];
+        role?: string | string[];
+        isBanned?: boolean;
+        banned?: boolean;
+      }>(token) || {};
 
-      // збережемо роли (може стати у пригоді в UI)
+      const rolesArr =
+        (Array.isArray(payload.roles) ? payload.roles : payload.roles ? [payload.roles] : []) as string[];
+      const rolesArr2 =
+        (Array.isArray(payload.role) ? payload.role : payload.role ? [payload.role] : []) as string[];
+      const roles = [...rolesArr, ...rolesArr2].map((r) => String(r));
+
       if (roles.length) localStorage.setItem("roles", JSON.stringify(roles));
 
-      // Редірект за роллю
+      // Перевірка бана: прапор або роль
+      const banned = Boolean(payload.isBanned ?? payload.banned) || roles.includes("Banned");
+      if (banned) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("roles");
+        setError("Ваш обліковий запис заблоковано.");
+        return;
+      }
+
+      // Редіректи: Адмін -> /admin, інші -> /home
       if (roles.includes("Admin")) {
         navigate("/admin");
       } else {
-        navigate("/product-search");
+        navigate("/home");
       }
     } catch (e: any) {
       setError(e?.message ?? "Не вдалося увійти.");
@@ -197,18 +213,14 @@ export default function Login() {
         >
           {submitting ? <CircularProgress size={22} sx={{ color: "white" }} /> : "Увійти"}
         </Button>
-        {/* <Button
-            fullWidth
-            variant="outlined"
-            sx={{ mt: 2, borderRadius: 999 }}
-            component="a"
-            href={`${import.meta.env.VITE_API_URL}/api/Account/ExternalLogin/google`} 
-            >
-            Увійти через Google
-        </Button> */}
-        <Button onClick={() => loginbygoogle()}>Sign in with Google 🚀</Button>
+
+        {/* OAuth-кнопка (як у тебе) */}
+        <Button onClick={() => loginbygoogle()} sx={{ mt: 2 }}>
+          Sign in with Google 🚀
+        </Button>
+
         <Typography sx={{ mt: 3, fontSize: 14 }}>
-          Ще не маєте облікового запису?{" "}
+          Ще не маєте облікового запису{" "}
           <Link
             component="button"
             underline="none"
