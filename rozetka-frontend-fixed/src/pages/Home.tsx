@@ -28,7 +28,7 @@ const toBaseName = (val?: string): string => {
   return v;
 };
 
-// API -> ProductTile DTO (додали categoryId для фільтра)
+// API -> ProductTile DTO (прокидуємо description, brand тощо + categoryId для фільтра)
 function mapApiProduct(x: any): ProductDto & { categoryId?: number } {
   const imgs = Array.isArray(x?.productImages) ? x.productImages : [];
   const ordered = imgs.slice().sort((a: any, b: any) => (a?.priority ?? 0) - (b?.priority ?? 0));
@@ -40,10 +40,20 @@ function mapApiProduct(x: any): ProductDto & { categoryId?: number } {
     name: String(x?.name ?? x?.title ?? "Товар"),
     title: String(x?.title ?? ""),
     price: Number(x?.price ?? 0),
+
     images,
     image: x?.image ?? null,
     imageUrl: x?.imageUrl ?? null,
     imagePath: x?.imagePath ?? null,
+
+    // ⬇️ важливо: опис і додаткові поля, щоб картка могла їх показати в "Більше"
+    description: typeof x?.description === "string" ? x.description : "",
+    brand: x?.brand ?? "",
+    brandSite: x?.brandSite ?? "",
+    size: x?.size ?? "",
+    color: x?.color ?? "",
+    year: x?.year ?? "",
+
     // для фільтру:
     categoryId,
   } as ProductDto & { categoryId?: number };
@@ -75,7 +85,7 @@ export default function Home() {
         setProducts((Array.isArray(prods) ? prods : []).map(mapApiProduct));
       })
       .finally(() => setLoading(false));
-  }, [API]);
+  }, [API]); // token мемоізований; authHeaders стабільні
 
   // Фільтр по категорії
   const filtered = activeCatId

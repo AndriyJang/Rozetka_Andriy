@@ -1,6 +1,6 @@
 // src/components/catalog/ProductTile.tsx
 import {
-  Card, CardContent, CardActions, Typography, Button, Box, Stack, IconButton,
+  Card, CardContent, CardActions, Typography, Button, Box, Stack, IconButton, Divider,
 } from "@mui/material";
 import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
 import CloseIcon from "@mui/icons-material/Close";
@@ -86,7 +86,6 @@ export default function ProductTile({ p }: { p: ProductDto }) {
   };
 
   return (
-    // ОБГОРТКА: дозволяє виходити за межі ґрід-комірки без зсуву макета
     <Box sx={{ position: "relative", overflow: "visible" }}>
       <Card
         variant="outlined"
@@ -95,9 +94,9 @@ export default function ProductTile({ p }: { p: ProductDto }) {
           height: "100%",
           display: "flex",
           flexDirection: "column",
-          overflow: "hidden", // базова картка не зростає
+          overflow: "hidden",
           position: "relative",
-          zIndex: openMore ? 11 : 1, // трохи підняти при відкритті (на випадок перекриття)
+          zIndex: openMore ? 11 : 1,
         }}
       >
         {/* зображення */}
@@ -146,7 +145,7 @@ export default function ProductTile({ p }: { p: ProductDto }) {
             {Number(p.price).toLocaleString("uk-UA")}₴
           </Typography>
 
-          {/* “Більше” — кнопка, що відкриває overlay, не змінюючи висоту картки */}
+          {/* “Більше” — overlay, не змінює висоту картки */}
           <Box sx={{ mt: 1 }}>
             <Button
               size="small"
@@ -179,45 +178,39 @@ export default function ProductTile({ p }: { p: ProductDto }) {
         </CardActions>
       </Card>
 
-      {/* OVERLAY: розширена картка поверх сітки, з власним скролом */}
+      {/* OVERLAY з описом уверху */}
       {openMore && (
         <Box
           role="dialog"
           aria-label={`Деталі товару ${title}`}
           sx={{
             position: "absolute",
-            // трішки більша за базову картку
             top: -12,
             left: -12,
             right: -12,
-            // можна також збільшити вниз, але не чіпаємо нижні елементи макета
             zIndex: 20,
             borderRadius: 3,
             bgcolor: "#fff",
             boxShadow: 12,
             border: "1px solid rgba(2,56,84,0.12)",
             maxHeight: "70vh",
-            overflow: "auto", // власний скрол усередині розширеної картки
+            overflow: "auto",
           }}
           onClick={(e) => e.stopPropagation()}
         >
-          {/* верхня шапка overlay */}
+          {/* шапка */}
           <Box sx={{ display: "flex", alignItems: "center", p: 1.5, pb: 1 }}>
             <Typography variant="subtitle1" sx={{ fontWeight: 700, color: "#023854", flex: 1 }}>
               {title}
             </Typography>
-            <IconButton
-              size="small"
-              onClick={() => setOpenMore(false)}
-              aria-label="Закрити деталі"
-            >
+            <IconButton size="small" onClick={() => setOpenMore(false)} aria-label="Закрити деталі">
               <CloseIcon fontSize="small" />
             </IconButton>
           </Box>
 
-          {/* контент overlay */}
+          {/* контент */}
           <Box sx={{ px: 2, pb: 2 }}>
-            {/* можна повторити превʼю зображення компактно */}
+            {/* превʼю (опційно) */}
             {!!src && (
               <Box sx={{ mb: 1.5, display: "grid", placeItems: "center" }}>
                 <Box
@@ -230,6 +223,17 @@ export default function ProductTile({ p }: { p: ProductDto }) {
               </Box>
             )}
 
+            <Stack spacing={0.5} sx={{ mb: 1.5 }}>
+           <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+               Опис
+           </Typography>
+          <Typography variant="body2" color="text.secondary">
+               {showVal(p.description)}
+          </Typography>
+          </Stack>
+
+            <Divider sx={{ mb: 1.5 }} />
+            {/* ХАРАКТЕРИСТИКИ */}
             <Stack spacing={0.5}>
               <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5 }}>
                 Характеристики
@@ -249,18 +253,10 @@ export default function ProductTile({ p }: { p: ProductDto }) {
               <Typography variant="body2" color="text.secondary">
                 <strong>Рік:</strong> {showVal(p.year)}
               </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                {showVal(p.description)}
-              </Typography>
             </Stack>
 
-            {/* нижня панель overlay (за бажанням) */}
             <Box sx={{ pt: 2, textAlign: "right" }}>
-              <Button
-                size="small"
-                onClick={() => setOpenMore(false)}
-                startIcon={<CloseIcon fontSize="small" />}
-              >
+              <Button size="small" onClick={() => setOpenMore(false)} startIcon={<CloseIcon fontSize="small" />}>
                 Закрити
               </Button>
             </Box>
