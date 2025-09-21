@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Identity;
 using RozetkaApi.Data.Entities;
+using rozetkabackend.Data.Entities.Catalog;
 using System;
 using System.Collections.Generic;
 
@@ -19,4 +20,5 @@ public class UserEntity : IdentityUser<long>
     //IsLoginGoogle = u.UserLogins.Any(l => l.LoginProvider == "Google"),
     public virtual ICollection<UserLoginEntity> Logins { get; set; }
     public virtual ICollection<PasswordResetToken> PasswordResetTokens { get; set; }
+    public ICollection<CartEntity> Carts { get; set; }
 }

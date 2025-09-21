@@ -45,6 +45,9 @@ namespace RozetkaApi.Data
                     .IsRequired();
             });
 
+            builder.Entity<CartEntity>()
+                .HasKey(pi => new { pi.ProductId, pi.UserId });
+
         }
     }
 }
