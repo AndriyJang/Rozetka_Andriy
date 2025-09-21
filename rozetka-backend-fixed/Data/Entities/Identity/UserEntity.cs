@@ -21,4 +21,5 @@ public class UserEntity : IdentityUser<long>
     public virtual ICollection<UserLoginEntity> Logins { get; set; }
     public virtual ICollection<PasswordResetToken> PasswordResetTokens { get; set; }
     public ICollection<CartEntity> Carts { get; set; }
+    public ICollection<OrderEntity> Orders { get; set; }
 }

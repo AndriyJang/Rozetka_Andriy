@@ -25,4 +25,5 @@ public class ProductEntity : BaseEntity<long>
 
     public ICollection<ProductImageEntity> ProductImages { get; set; }
     public ICollection<CartEntity> Carts { get; set; }
+    public ICollection<OrderItemEntity> OrderItems { get; set; }
 }
