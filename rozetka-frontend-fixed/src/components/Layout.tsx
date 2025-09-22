@@ -1,5 +1,6 @@
 import Header from "./Header";
 import Footer from "./Footer";
+import ToastHost from "./ToastHost";
 import { Box } from "@mui/material";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
@@ -29,6 +30,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </Box>
 
       <Footer />
+       <ToastHost />
     </Box>
   );
 }

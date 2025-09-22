@@ -1,4 +1,3 @@
-// src/components/catalog/ProductTile.tsx
 import {
   Card, CardContent, CardActions, Typography, Button, Box, Stack, IconButton, Divider,
 } from "@mui/material";
@@ -6,8 +5,9 @@ import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
 import CloseIcon from "@mui/icons-material/Close";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
-import { Link as RouterLink } from "react-router-dom";
+import { Link as RouterLink, useNavigate } from "react-router-dom";
 import { useMemo, useState } from "react";
+import { toast } from "../../components/ToastHost";
 
 export type ProductDto = {
   id: number;
@@ -50,6 +50,8 @@ function absUrl(path?: string | null) {
 }
 
 export default function ProductTile({ p }: { p: ProductDto }) {
+  const navigate = useNavigate();
+
   const title = p.name || p.title || "Товар";
 
   const firstImageBase = useMemo(() => {
@@ -82,8 +84,44 @@ export default function ProductTile({ p }: { p: ProductDto }) {
   };
 
   const addToCart = async () => {
-    // TODO: коли з'явиться ендпоінт кошика — підстав запит сюди
-  };
+  const token = localStorage.getItem("token") ?? "";
+  if (!token) { navigate("/login"); return; }
+
+  try {
+    // 1) дізнатись поточну к-сть цього товару
+    const get = await fetch(`${API}/api/Cart/GetCart`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const list = get.ok ? await get.json() : [];
+    const row = Array.isArray(list) ? list.find((x: any) => Number(x?.productId ?? x?.id) === p.id) : null;
+    const nextQty = Number(row?.quantity ?? 0) + 1;
+
+    // 2) виставити НОВЕ значення
+    const res = await fetch(`${API}/api/Cart/CreateUpdate`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ productId: p.id, quantity: nextQty }),
+    });
+
+    if (res.status === 401) { navigate("/login"); return; }
+    if (!res.ok) throw new Error("Не вдалося оновити кошик");
+
+    // 3) сповістити UI
+    try {
+      localStorage.setItem("cart:changed", String(Date.now()));
+      window.dispatchEvent(new Event("cart:changed"));
+    } catch {}
+
+    // тост
+    toast("Товар додано в кошик ✅", { severity: "success" });
+  } catch (e) {
+    console.error(e);
+    toast("Сталася помилка під час додавання", { severity: "error" });
+  }
+};
 
   return (
     <Box sx={{ position: "relative", overflow: "visible" }}>
@@ -145,7 +183,7 @@ export default function ProductTile({ p }: { p: ProductDto }) {
             {Number(p.price).toLocaleString("uk-UA")}₴
           </Typography>
 
-          {/* “Більше” — overlay, не змінює висоту картки */}
+          {/* “Більше” — overlay */}
           <Box sx={{ mt: 1 }}>
             <Button
               size="small"
@@ -210,7 +248,6 @@ export default function ProductTile({ p }: { p: ProductDto }) {
 
           {/* контент */}
           <Box sx={{ px: 2, pb: 2 }}>
-            {/* превʼю (опційно) */}
             {!!src && (
               <Box sx={{ mb: 1.5, display: "grid", placeItems: "center" }}>
                 <Box
@@ -223,36 +260,28 @@ export default function ProductTile({ p }: { p: ProductDto }) {
               </Box>
             )}
 
+            {/* Опис */}
             <Stack spacing={0.5} sx={{ mb: 1.5 }}>
-           <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-               Опис
-           </Typography>
-          <Typography variant="body2" color="text.secondary">
-               {showVal(p.description)}
-          </Typography>
-          </Stack>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                Опис
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {showVal(p.description)}
+              </Typography>
+            </Stack>
 
             <Divider sx={{ mb: 1.5 }} />
-            {/* ХАРАКТЕРИСТИКИ */}
+
+            {/* Характеристики */}
             <Stack spacing={0.5}>
               <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5 }}>
                 Характеристики
               </Typography>
-              <Typography variant="body2" color="text.secondary">
-                <strong>Виробник:</strong> {showVal(p.brand)}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                <strong>Сайт виробника:</strong> {showVal(p.brandSite)}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                <strong>Розмір:</strong> {showVal(p.size)}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                <strong>Колір:</strong> {showVal(p.color)}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                <strong>Рік:</strong> {showVal(p.year)}
-              </Typography>
+              <Typography variant="body2" color="text.secondary"><strong>Виробник:</strong> {showVal(p.brand)}</Typography>
+              <Typography variant="body2" color="text.secondary"><strong>Сайт виробника:</strong> {showVal(p.brandSite)}</Typography>
+              <Typography variant="body2" color="text.secondary"><strong>Розмір:</strong> {showVal(p.size)}</Typography>
+              <Typography variant="body2" color="text.secondary"><strong>Колір:</strong> {showVal(p.color)}</Typography>
+              <Typography variant="body2" color="text.secondary"><strong>Рік:</strong> {showVal(p.year)}</Typography>
             </Stack>
 
             <Box sx={{ pt: 2, textAlign: "right" }}>

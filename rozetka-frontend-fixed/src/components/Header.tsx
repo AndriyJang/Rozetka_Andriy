@@ -1,48 +1,102 @@
+// src/components/Header.tsx
 import {
-  AppBar, Toolbar, Typography, Button, InputBase, Box, IconButton, Badge
+  AppBar, Toolbar, Typography, Button, InputBase, Box, IconButton, Badge,
 } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
 import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
 import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
 import { useNavigate } from "react-router-dom";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 
 type Role = "Guest" | "User" | "Admin";
 
-function decodeJwt(token: string) {
+function safeGetToken(): string {
+  try { return localStorage.getItem("token") ?? ""; } catch { return ""; }
+}
+function safeGetRoles(): string[] {
+  try { return JSON.parse(localStorage.getItem("roles") || "[]"); } catch { return []; }
+}
+
+// Примітивний декодер JWT
+function decodeJwt(token: string): any | null {
   try {
     const [, payload] = token.split(".");
-    const json = atob(payload.replace(/-/g, "+").replace(/_/g, "/"));
-    return JSON.parse(decodeURIComponent(escape(json)));
+    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const json = decodeURIComponent(
+      atob(base64)
+        .split("")
+        .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+        .join("")
+    );
+    return JSON.parse(json);
   } catch { return null; }
 }
 
 function getRoleFromToken(token: string): Role {
   if (!token) return "Guest";
   const p = decodeJwt(token) || {};
-  // якщо є exp і він минув — вважаємо гість
   if (typeof p.exp === "number" && p.exp * 1000 < Date.now()) return "Guest";
-  const roles = Array.isArray(p.roles) ? p.roles : (p.roles ? [p.roles] : []);
+  const roles = Array.isArray(p.roles) ? p.roles : p.roles ? [p.roles] : safeGetRoles();
   return roles.includes("Admin") ? "Admin" : "User";
 }
 
 export default function Header() {
   const navigate = useNavigate();
+  const [token, setToken] = useState<string>(() => safeGetToken());
+  const role: Role = useMemo(() => getRoleFromToken(token), [token]);
 
-  // читаємо токен щоразу, коли вкладка оновилась або інша вкладка змінила localStorage
-  const [token, setToken] = useState<string>(() => localStorage.getItem("token") ?? "");
+  const RAW_API = import.meta.env.VITE_API_URL || "";
+  const API = RAW_API.replace(/\/+$/, "");
+
+  // Кількість товарів у кошику
+  const [cartCount, setCartCount] = useState<number>(0);
+
+  const fetchCartCount = useCallback(async () => {
+    if (role === "Guest") { setCartCount(0); return; }
+    try {
+      const res = await fetch(`${API}/api/Cart/GetCart`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (res.status === 401) { setCartCount(0); return; }
+      if (!res.ok) { setCartCount(0); return; }
+      const data = await res.json();
+      const count = Array.isArray(data)
+        ? data.reduce((sum: number, it: any) => sum + Number(it?.quantity ?? 0), 0)
+        : 0;
+      setCartCount(Number.isFinite(count) ? count : 0);
+    } catch { setCartCount(0); }
+  }, [API, role, token]);
+
+  // Оновлюємо токен при змінах у localStorage (в іншій вкладці) та при mount
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
-      if (e.key === "token") setToken(localStorage.getItem("token") ?? "");
+      if (e.key === "token") setToken(safeGetToken());
+      if (e.key === "roles") setToken(safeGetToken()); // ролі теж можуть змінитись
     };
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
   }, []);
 
-  const role: Role = useMemo(() => getRoleFromToken(token), [token]);
+  // Підтягнути лічильник при зміні токена/ролі
+  useEffect(() => { fetchCartCount(); }, [fetchCartCount]);
 
-  // (якщо буде енд-поінт) — поки 0
-  const cartCount = 0;
+  // Коли вкладка повертається у фокус — оновити
+  useEffect(() => {
+    const onVis = () => { if (document.visibilityState === "visible") fetchCartCount(); };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [fetchCartCount]);
+
+  // Стиль кнопки в правій частині
+  const btnSx = {
+    background: "linear-gradient(90deg, #023854 0%, #035B94 100%)",
+    borderRadius: "20px",
+    textTransform: "none",
+    px: 4,
+    boxShadow: 2,
+    fontSize: 14,
+    "&:hover": { opacity: 0.95, background: "linear-gradient(90deg, #023854 0%, #035B94 100%)" },
+  } as const;
 
   return (
     <AppBar position="static" sx={{ backgroundColor: "#FFFFFF", boxShadow: 1 }}>
@@ -55,7 +109,8 @@ export default function Header() {
             </IconButton>
             <Typography
               variant="h6"
-              sx={{ fontFamily: "Montserrat", fontWeight: "bold", fontSize: 32, color: "#023854" }}
+              sx={{ fontFamily: "Montserrat", fontWeight: "bold", fontSize: 32, color: "#023854", cursor: "pointer" }}
+              onClick={() => navigate("/home")}
             >
               NUVORA
             </Typography>
@@ -116,18 +171,7 @@ export default function Header() {
                 </Badge>
               </IconButton>
             ) : (
-              <Button
-                variant="contained"
-                sx={{
-                  background: "linear-gradient(90deg, #023854 0%, #035B94 100%)",
-                  borderRadius: "20px",
-                  textTransform: "none",
-                  px: 4,
-                  boxShadow: 2,
-                  fontSize: 14,
-                }}
-                onClick={() => navigate("/login")}
-              >
+              <Button variant="contained" sx={btnSx} onClick={() => navigate("/login")}>
                 Вхід
               </Button>
             )}

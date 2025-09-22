@@ -11,9 +11,11 @@ import Categorie from "./pages/Categorie";
 import OAuthCallback from "./pages/OAuthCallback";
 import Cart from "./pages/Cart";
 import ProductDetails from "./pages/ProductDetails"; //  новий імпорт
+import ToastHost from "./components/ToastHost";
 
 export default function App() {
   return (
+    <>
     <Routes>
       <Route path="/" element={<Navigate to="/home" replace />} />
       <Route path="/home" element={<Home />} />
@@ -30,5 +32,7 @@ export default function App() {
       <Route path="/cart" element={<Cart />} />
       <Route path="*" element={<div style={{ padding: 24 }}>Page not found</div>} />
     </Routes>
+    <ToastHost />
+    </>
   );
 }
