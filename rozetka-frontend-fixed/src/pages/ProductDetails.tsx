@@ -1,6 +1,6 @@
 // src/pages/ProductDetails.tsx
 import Layout from "../components/Layout";
-import { useParams, Link as RouterLink } from "react-router-dom";
+import { useParams, Link as RouterLink, useNavigate } from "react-router-dom";
 import {
   Box,
   Container,
@@ -17,6 +17,7 @@ import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import ProductTile, { type ProductDto } from "../components/catalog/ProductTile";
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "../components/ToastHost";
 
 // ===== helpers =====
 const RAW_API = import.meta.env.VITE_API_URL ?? "";
@@ -48,6 +49,9 @@ type ApiProduct = {
   category?: { id: number; name: string } | null;
   categoryId?: number | null;
   productImages?: { id: number; name: string; priority: number }[];
+  image?: string | null;
+  imageUrl?: string | null;
+  imagePath?: string | null;
 };
 
 // для ред’юса в пов’язках
@@ -101,14 +105,36 @@ function InfoRowCompact({ label, value }: { label: string; value: string | numbe
   );
 }
 
+// побудувати масив кандидатів зображень для товару
+function buildImageNames(p: ApiProduct): string[] {
+  const fromProductImages =
+    (p.productImages ?? [])
+      .slice()
+      .sort((a, b) => (a?.priority ?? 0) - (b?.priority ?? 0))
+      .map(i => toBaseName(i?.name))
+      .filter(Boolean) as string[];
+
+  const singles = [p.imageUrl, p.imagePath, p.image]
+    .filter(Boolean)
+    .map(s => toBaseName(String(s))) as string[];
+
+  const uniq: string[] = [];
+  for (const n of [...fromProductImages, ...singles]) {
+    if (n && !uniq.includes(n)) uniq.push(n);
+  }
+  return uniq;
+}
+
 export default function ProductDetails() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const token = useMemo(() => localStorage.getItem("token") ?? "", []);
   const authHeaders: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
 
   const [prod, setProd] = useState<ApiProduct | null>(null);
   const [related, setRelated] = useState<(ProductDto & { categoryId?: number })[]>([]);
   const [imgNames, setImgNames] = useState<string[]>([]);
+  const [selIdx, setSelIdx] = useState(0);
   const [loading, setLoading] = useState(true);
 
   // заглушки рейтингу для блоку “Відгуки”
@@ -128,21 +154,20 @@ export default function ProductDetails() {
 
         setProd(data);
 
-        // зображення
-        const ordered = (data.productImages ?? [])
-          .slice()
-          .sort((a, b) => (a?.priority ?? 0) - (b?.priority ?? 0));
-        setImgNames(ordered.map(i => toBaseName(i.name)).filter(Boolean));
+        // зображення (в т.ч. фолбеки з imageUrl/imagePath/image)
+        const names = buildImageNames(data);
+        setImgNames(names);
+        setSelIdx(0);
 
-        // пов’язані: всі з цієї категорії (тільки 1 ряд)
+        // пов’язані: всі з цієї категорії (тільки 1 ряд, до 7 штук)
         const listRes = await fetch(`${API}/api/Products`, { headers: authHeaders });
         const listJson = listRes.ok ? await listRes.json() : [];
         const all = (Array.isArray(listJson) ? listJson : []).map(mapApiProductToTile);
         const same = data?.category?.id
-          ? all.filter(p => p.categoryId === data.category!.id && p.id !== data.id).slice(0, 5)
-          : all.slice(0, 5);
+          ? all.filter(p => p.categoryId === data.category!.id && p.id !== data.id).slice(0, 7)
+          : all.slice(0, 7);
         setRelated(same);
-      } catch (e) {
+      } catch {
         // no-op
       } finally {
         if (mounted) setLoading(false);
@@ -150,16 +175,35 @@ export default function ProductDetails() {
     }
 
     load();
-    return () => {
-      mounted = false;
-    };
+    return () => { mounted = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  const mainImg = imgNames[0] ? imgUrl(imgNames[0], 800) : "";
+  const mainImg = imgNames[selIdx] ? imgUrl(imgNames[selIdx], 800) : "";
 
   const addToCart = async () => {
-    // TODO: підставити ендпоінт кошика, коли буде
+    const t = localStorage.getItem("token") ?? "";
+    if (!t) { navigate("/login"); return; }
+
+    try {
+      const r = await fetch(`${API}/api/Cart/CreateUpdate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${t}` },
+        body: JSON.stringify({ productId: Number(id), quantity: 1 }),
+      });
+      if (r.status === 401) { navigate("/login"); return; }
+      if (!r.ok) throw new Error("Не вдалося додати до кошика");
+
+      try {
+        localStorage.setItem("cart:changed", String(Date.now()));
+        window.dispatchEvent(new Event("cart:changed"));
+      } catch {}
+
+      toast("Товар додано в кошик ✅", { severity: "success" });
+    } catch (e) {
+      console.error(e);
+      toast("Сталася помилка під час додавання", { severity: "error" });
+    }
   };
 
   return (
@@ -200,7 +244,8 @@ export default function ProductDetails() {
                     sx={{ width: "100%", maxHeight: 520, objectFit: "contain" }}
                     onError={(e: any) => {
                       const el = e.currentTarget as HTMLImageElement;
-                      if (imgNames[0]) el.src = imgUrl(imgNames[0], 0);
+                      const base = imgNames[selIdx];
+                      if (base) el.src = imgUrl(base, 0);
                     }}
                   />
                 ) : (
@@ -211,19 +256,23 @@ export default function ProductDetails() {
               {/* мініатюри */}
               {imgNames.length > 0 && (
                 <Box sx={{ p: 1.5, pt: 0, display: "flex", gap: 1, flexWrap: "wrap" }}>
-                  {imgNames.map((n) => (
+                  {imgNames.map((n, i) => (
                     <Box
-                      key={n}
+                      key={n + i}
                       component="img"
                       src={imgUrl(n, 200)}
                       alt=""
-                      onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+                      onClick={() => setSelIdx(i)}
+                      onError={(e: any) => {
+                        const el = e.currentTarget as HTMLImageElement;
+                        el.src = imgUrl(n, 0);
+                      }}
                       style={{
                         width: 72,
                         height: 72,
                         objectFit: "cover",
                         borderRadius: 8,
-                        border: "1px solid #eaecef",
+                        border: i === selIdx ? "2px solid #0b8a83" : "1px solid #eaecef",
                         cursor: "pointer",
                       }}
                     />
@@ -261,7 +310,7 @@ export default function ProductDetails() {
                 </Button>
               </Paper>
 
-              {/* Характеристики (компактно, трохи менший шрифт та щільність) */}
+              {/* Характеристики (компактно) */}
               <Paper variant="outlined" sx={{ borderRadius: 3, overflow: "hidden" }}>
                 <Box sx={{ px: 2, py: 1, bgcolor: "#f6faf9" }}>
                   <Typography sx={{ fontWeight: 700, color: "#023854", fontSize: 14 }}>
@@ -299,19 +348,31 @@ export default function ProductDetails() {
           </Grid>
         </Grid>
 
-        {/* Один ряд товарів з категорії */}
+        {/* Один ряд товарів з категорії (до 7 шт.) */}
         {!!related.length && (
           <Box sx={{ mt: 3 }}>
             <Typography variant="h6" sx={{ fontWeight: 800, mb: 1 }}>
               Купують з цим товаром
             </Typography>
-            <Grid container spacing={2}>
-              {related.slice(0, 5).map((p) => (
-                <Grid item key={p.id} xs={12} sm={6} md={4} lg={2.4 as any}>
+
+            <Box
+              sx={{
+                display: "grid",
+                gap: 2,
+                gridTemplateColumns: {
+                  xs: "repeat(2, 1fr)",
+                  sm: "repeat(3, 1fr)",
+                  md: "repeat(4, 1fr)",
+                  lg: "repeat(7, 1fr)", // строго 7 на великих екранах
+                },
+              }}
+            >
+              {related.slice(0, 7).map((p) => (
+                <Box key={p.id}>
                   <ProductTile p={p} />
-                </Grid>
+                </Box>
               ))}
-            </Grid>
+            </Box>
           </Box>
         )}
 
@@ -363,7 +424,6 @@ export default function ProductDetails() {
                   gap: 1.25,
                 }}
               >
-                {/* ← ОТУТ тільки зірочки */}
                 <Rating value={avgRating} precision={0.5} readOnly size="medium" />
                 <Typography variant="body2" color="text.secondary">
                   Середня оцінка: {avgRating.toFixed(1)} / 5 • {reviewsCount} відгуки
@@ -385,8 +445,6 @@ export default function ProductDetails() {
             </Grid>
           </Grid>
         </Box>
-
-        {/* Футер уже в Layout, додаткових блоків “про Nuvora” тут немає */}
       </Container>
     </Layout>
   );

@@ -105,16 +105,16 @@ export default function ProductTile({ p }: { p: ProductDto }) {
       },
       body: JSON.stringify({ productId: p.id, quantity: nextQty }),
     });
+  
 
     if (res.status === 401) { navigate("/login"); return; }
     if (!res.ok) throw new Error("Не вдалося оновити кошик");
 
     // 3) сповістити UI
     try {
-      localStorage.setItem("cart:changed", String(Date.now()));
-      window.dispatchEvent(new Event("cart:changed"));
-    } catch {}
-
+        localStorage.setItem("cart:changed", String(Date.now()));
+        window.dispatchEvent(new Event("cart:changed"));
+}   catch {}
     // тост
     toast("Товар додано в кошик ✅", { severity: "success" });
   } catch (e) {

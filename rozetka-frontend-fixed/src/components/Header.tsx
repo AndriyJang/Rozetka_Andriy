@@ -1,102 +1,85 @@
 // src/components/Header.tsx
 import {
-  AppBar, Toolbar, Typography, Button, InputBase, Box, IconButton, Badge,
+  AppBar, Toolbar, Typography, Button, InputBase, Box, IconButton
 } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
 import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
 import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
 import { useNavigate } from "react-router-dom";
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type Role = "Guest" | "User" | "Admin";
 
-function safeGetToken(): string {
-  try { return localStorage.getItem("token") ?? ""; } catch { return ""; }
-}
-function safeGetRoles(): string[] {
-  try { return JSON.parse(localStorage.getItem("roles") || "[]"); } catch { return []; }
-}
-
-// Примітивний декодер JWT
-function decodeJwt(token: string): any | null {
+function decodeJwt(token: string) {
   try {
     const [, payload] = token.split(".");
-    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
-    const json = decodeURIComponent(
-      atob(base64)
-        .split("")
-        .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
-        .join("")
-    );
-    return JSON.parse(json);
+    const json = atob(payload.replace(/-/g, "+").replace(/_/g, "/"));
+    return JSON.parse(decodeURIComponent(escape(json)));
   } catch { return null; }
 }
-
 function getRoleFromToken(token: string): Role {
   if (!token) return "Guest";
   const p = decodeJwt(token) || {};
   if (typeof p.exp === "number" && p.exp * 1000 < Date.now()) return "Guest";
-  const roles = Array.isArray(p.roles) ? p.roles : p.roles ? [p.roles] : safeGetRoles();
+  const roles = Array.isArray(p.roles) ? p.roles : (p.roles ? [p.roles] : []);
   return roles.includes("Admin") ? "Admin" : "User";
 }
 
+const RAW_API = import.meta.env.VITE_API_URL ?? "";
+const API = RAW_API.replace(/\/+$/, "");
+
 export default function Header() {
   const navigate = useNavigate();
-  const [token, setToken] = useState<string>(() => safeGetToken());
+
+  const [token, setToken] = useState<string>(() => localStorage.getItem("token") ?? "");
   const role: Role = useMemo(() => getRoleFromToken(token), [token]);
 
-  const RAW_API = import.meta.env.VITE_API_URL || "";
-  const API = RAW_API.replace(/\/+$/, "");
+  // два числа: distinct / totalQty
+  const [distinctCount, setDistinctCount] = useState(0);
+  const [totalQty, setTotalQty] = useState(0);
 
-  // Кількість товарів у кошику
-  const [cartCount, setCartCount] = useState<number>(0);
+  // ✅ Побудова headers без проблем з типами
+  const buildHeaders = (): Headers => {
+    const h = new Headers();
+    if (token) h.set("Authorization", `Bearer ${token}`);
+    return h;
+  };
 
-  const fetchCartCount = useCallback(async () => {
-    if (role === "Guest") { setCartCount(0); return; }
+  const loadCartCounters = async () => {
+    if (!token) { setDistinctCount(0); setTotalQty(0); return; }
     try {
-      const res = await fetch(`${API}/api/Cart/GetCart`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      if (res.status === 401) { setCartCount(0); return; }
-      if (!res.ok) { setCartCount(0); return; }
-      const data = await res.json();
-      const count = Array.isArray(data)
-        ? data.reduce((sum: number, it: any) => sum + Number(it?.quantity ?? 0), 0)
-        : 0;
-      setCartCount(Number.isFinite(count) ? count : 0);
-    } catch { setCartCount(0); }
-  }, [API, role, token]);
+      const r = await fetch(`${API}/api/Cart/GetCart`, { headers: buildHeaders() });
+      const data = r.ok ? await r.json() : [];
+      if (Array.isArray(data)) {
+        setDistinctCount(data.length);
+        setTotalQty(data.reduce((s: number, it: any) => s + Number(it?.quantity ?? 0), 0));
+      } else {
+        setDistinctCount(0);
+        setTotalQty(0);
+      }
+    } catch {
+      // ignore
+    }
+  };
 
-  // Оновлюємо токен при змінах у localStorage (в іншій вкладці) та при mount
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
-      if (e.key === "token") setToken(safeGetToken());
-      if (e.key === "roles") setToken(safeGetToken()); // ролі теж можуть змінитись
+      if (e.key === "token") setToken(localStorage.getItem("token") ?? "");
+      if (e.key === "cart:changed") loadCartCounters();
     };
     window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
-  }, []);
 
-  // Підтягнути лічильник при зміні токена/ролі
-  useEffect(() => { fetchCartCount(); }, [fetchCartCount]);
+    const onLocal = () => loadCartCounters();
+    window.addEventListener("cart:changed", onLocal as EventListener);
 
-  // Коли вкладка повертається у фокус — оновити
-  useEffect(() => {
-    const onVis = () => { if (document.visibilityState === "visible") fetchCartCount(); };
-    document.addEventListener("visibilitychange", onVis);
-    return () => document.removeEventListener("visibilitychange", onVis);
-  }, [fetchCartCount]);
+    loadCartCounters();
 
-  // Стиль кнопки в правій частині
-  const btnSx = {
-    background: "linear-gradient(90deg, #023854 0%, #035B94 100%)",
-    borderRadius: "20px",
-    textTransform: "none",
-    px: 4,
-    boxShadow: 2,
-    fontSize: 14,
-    "&:hover": { opacity: 0.95, background: "linear-gradient(90deg, #023854 0%, #035B94 100%)" },
-  } as const;
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("cart:changed", onLocal as EventListener);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
 
   return (
     <AppBar position="static" sx={{ backgroundColor: "#FFFFFF", boxShadow: 1 }}>
@@ -109,8 +92,7 @@ export default function Header() {
             </IconButton>
             <Typography
               variant="h6"
-              sx={{ fontFamily: "Montserrat", fontWeight: "bold", fontSize: 32, color: "#023854", cursor: "pointer" }}
-              onClick={() => navigate("/home")}
+              sx={{ fontFamily: "Montserrat", fontWeight: "bold", fontSize: 32, color: "#023854" }}
             >
               NUVORA
             </Typography>
@@ -156,22 +138,62 @@ export default function Header() {
               </IconButton>
             ) : role === "User" ? (
               <IconButton
-                onClick={() => navigate("/cart")}
-                sx={{
-                  width: 44, height: 44, borderRadius: "22px",
-                  background: "linear-gradient(90deg, #023854 0%, #035B94 100%)",
-                  boxShadow: 2, color: "#fff",
-                  "&:hover": { opacity: 0.95, background: "linear-gradient(90deg, #023854 0%, #035B94 100%)" },
-                }}
-                aria-label="Кошик"
-                title="Кошик"
-              >
-                <Badge color="error" badgeContent={cartCount} overlap="circular">
-                  <ShoppingCartIcon />
-                </Badge>
-              </IconButton>
+  onClick={() => navigate("/cart")}
+  sx={{
+    width: 44, height: 44, borderRadius: "22px",
+    background: "linear-gradient(90deg, #023854 0%, #035B94 100%)",
+    boxShadow: 2, color: "#fff",
+    position: "relative",
+    "&:hover": { opacity: 0.95, background: "linear-gradient(90deg, #023854 0%, #035B94 100%)" },
+  }}
+  aria-label="Кошик"
+  title="Кошик"
+>
+  <ShoppingCartIcon />
+
+  {/* ДВОРІВНЕВИЙ ЛЕЙБЛ — винесений правіше і вище іконки */}
+  <Box
+    sx={{
+      position: "absolute",
+      top: -8,
+      right: -18,          // було -4 — виніс правіше
+      transform: "none",   // можна 'translateX(0)' для ясності
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      gap: 0.2,
+      px: 0.7,
+      py: 0.5,
+      bgcolor: "#e11d48",
+      color: "#fff",
+      borderRadius: "8px",
+      minWidth: 20,
+      lineHeight: 1,
+      pointerEvents: "none", // щоб не заважав кліку
+      boxShadow: 2,
+    }}
+  >
+    <Typography sx={{ fontSize: 10, fontWeight: 800, m: 0, lineHeight: 1 }}>
+      {distinctCount}
+    </Typography>
+    <Typography sx={{ fontSize: 10, fontWeight: 800, m: 0, lineHeight: 1 }}>
+      {totalQty}
+    </Typography>
+  </Box>
+</IconButton>
             ) : (
-              <Button variant="contained" sx={btnSx} onClick={() => navigate("/login")}>
+              <Button
+                variant="contained"
+                sx={{
+                  background: "linear-gradient(90deg, #023854 0%, #035B94 100%)",
+                  borderRadius: "20px",
+                  textTransform: "none",
+                  px: 4,
+                  boxShadow: 2,
+                  fontSize: 14,
+                }}
+                onClick={() => navigate("/login")}
+              >
                 Вхід
               </Button>
             )}
