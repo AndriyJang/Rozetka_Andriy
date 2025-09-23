@@ -11,6 +11,7 @@ public class OrderEntity : BaseEntity<long>
     public long OrderStatusId { get; set; }
     [ForeignKey(nameof(User))]
     public long UserId { get; set; }
+    public string Comment { get; set; }
     public OrderStatusEntity? OrderStatus { get; set; }
     public UserEntity? User { get; set; }
 
