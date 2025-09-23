@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using rozetkabackend.Interfaces;
 using rozetkabackend.Models.Cart;
+using rozetkabackend.Services;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -43,4 +44,5 @@ public class CartController(ICartService cartService) : ControllerBase
         await cartService.Delete(id);
         return Ok();
     }
+    
 }

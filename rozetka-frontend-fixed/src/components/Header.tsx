@@ -5,7 +5,9 @@ import {
 import MenuIcon from "@mui/icons-material/Menu";
 import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
 import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
-import { useNavigate } from "react-router-dom";
+import LogoutIcon from "@mui/icons-material/Logout";              // ⬅️ додано
+import AccountCircleIcon from "@mui/icons-material/AccountCircle"; // ⬅️ додано
+import { useNavigate, useLocation } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 
 type Role = "Guest" | "User" | "Admin";
@@ -30,15 +32,18 @@ const API = RAW_API.replace(/\/+$/, "");
 
 export default function Header() {
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [token, setToken] = useState<string>(() => localStorage.getItem("token") ?? "");
   const role: Role = useMemo(() => getRoleFromToken(token), [token]);
 
-  // два числа: distinct / totalQty
+  // counters
   const [distinctCount, setDistinctCount] = useState(0);
   const [totalQty, setTotalQty] = useState(0);
 
-  // ✅ Побудова headers без проблем з типами
+  const isSearchPage = location.pathname.startsWith("/product-search");
+  const placeholder = isSearchPage ? "на головну" : "Я шукаю...";
+
   const buildHeaders = (): Headers => {
     const h = new Headers();
     if (token) h.set("Authorization", `Bearer ${token}`);
@@ -57,9 +62,7 @@ export default function Header() {
         setDistinctCount(0);
         setTotalQty(0);
       }
-    } catch {
-      // ignore
-    }
+    } catch {}
   };
 
   useEffect(() => {
@@ -73,13 +76,37 @@ export default function Header() {
     window.addEventListener("cart:changed", onLocal as EventListener);
 
     loadCartCounters();
-
     return () => {
       window.removeEventListener("storage", onStorage);
       window.removeEventListener("cart:changed", onLocal as EventListener);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
+
+ const logout = () => {
+  try {
+    // 1) прибираємо автентифікацію
+    localStorage.removeItem("token");
+    localStorage.removeItem("roles");
+
+    // 2) синхронно оновлюємо локальний стан, щоб роль одразу стала Guest
+    setToken("");
+
+    // 3) скидаємо бейдж кошика і повідомляємо слухачів
+    setDistinctCount(0);
+    setTotalQty(0);
+    localStorage.setItem("cart:changed", String(Date.now()));
+    window.dispatchEvent(new Event("cart:changed"));
+    window.dispatchEvent(new StorageEvent("storage", { key: "token" }));
+  } catch {}
+
+  // 4) редірект на головну
+  navigate("/home", { replace: true });
+};
+
+  const profile = () => {
+    navigate("/profile"); // заглушка, зробите сторінку — підставите
+  };
 
   return (
     <AppBar position="static" sx={{ backgroundColor: "#FFFFFF", boxShadow: 1 }}>
@@ -99,28 +126,35 @@ export default function Header() {
           </Box>
         </Box>
 
-        {/* Центр: пошук */}
+        {/* Центр: поле-посилання */}
         <Box sx={{ flex: 1, display: "flex", justifyContent: "center", alignItems: "center" }}>
-          <InputBase
-            placeholder="Я шукаю..."
-            sx={{
-              backgroundColor: "#EFF3F3",
-              borderRadius: "20px",
-              px: 2,
-              py: 1,
-              width: "100%",
-              maxWidth: 640,
-              fontSize: 16,
-              color: "#023854",
-            }}
-            inputProps={{ sx: { textAlign: "center" } }}
-          />
+          <Box sx={{ width: "100%", maxWidth: 640 }}>
+            <InputBase
+              placeholder={placeholder}
+              readOnly
+              onClick={() => { if (isSearchPage) navigate("/home"); }}     // ⬅️ на сторінці пошуку — перехід ПО КЛІКУ
+              onMouseEnter={() => { if (!isSearchPage) navigate("/product-search"); }} // ⬅️ на інших — по hover на пошук
+              sx={{
+                backgroundColor: "#EFF3F3",
+                borderRadius: "20px",
+                px: 2,
+                py: 1,
+                width: "100%",
+                fontSize: 16,
+                color: "#023854",
+                cursor: "pointer",
+                textAlign: "center",
+                "& input": { textAlign: "center" },
+              }}
+              inputProps={{ "aria-label": placeholder }}
+            />
+          </Box>
         </Box>
 
         {/* Права частина */}
         <Box sx={{ flex: 1, display: "flex", justifyContent: "center", alignItems: "center" }}>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-            <Typography sx={{ color: "#023854", fontSize: 14 }}>UA / ENG</Typography>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.2 }}>
+            <Typography sx={{ color: "#023854", fontSize: 14, mr: 0.8 }}>UA / ENG</Typography>
 
             {role === "Admin" ? (
               <IconButton
@@ -137,50 +171,68 @@ export default function Header() {
                 <AdminPanelSettingsIcon />
               </IconButton>
             ) : role === "User" ? (
-              <IconButton
-  onClick={() => navigate("/cart")}
-  sx={{
-    width: 44, height: 44, borderRadius: "22px",
-    background: "linear-gradient(90deg, #023854 0%, #035B94 100%)",
-    boxShadow: 2, color: "#fff",
-    position: "relative",
-    "&:hover": { opacity: 0.95, background: "linear-gradient(90deg, #023854 0%, #035B94 100%)" },
-  }}
-  aria-label="Кошик"
-  title="Кошик"
->
-  <ShoppingCartIcon />
+              <>
+                <IconButton
+                  onClick={() => navigate("/cart")}
+                  sx={{
+                    width: 44, height: 44, borderRadius: "22px",
+                    background: "linear-gradient(90deg, #023854 0%, #035B94 100%)",
+                    boxShadow: 2, color: "#fff",
+                    position: "relative",
+                    "&:hover": { opacity: 0.95, background: "linear-gradient(90deg, #023854 0%, #035B94 100%)" },
+                  }}
+                  aria-label="Кошик"
+                  title="Кошик"
+                >
+                  <ShoppingCartIcon />
+                  {/* двоповерхова бейджа */}
+                  <Box
+                    sx={{
+                      position: "absolute", top: -8, right: -18,
+                      display: "flex", flexDirection: "column", alignItems: "center",
+                      gap: 0.2, px: 0.7, py: 0.5, bgcolor: "#e11d48", color: "#fff",
+                      borderRadius: "8px", minWidth: 20, lineHeight: 1, pointerEvents: "none", boxShadow: 2,
+                    }}
+                  >
+                    <Typography sx={{ fontSize: 10, fontWeight: 800, m: 0, lineHeight: 1 }}>
+                      {distinctCount}
+                    </Typography>
+                    <Typography sx={{ fontSize: 10, fontWeight: 800, m: 0, lineHeight: 1 }}>
+                      {totalQty}
+                    </Typography>
+                  </Box>
+                </IconButton>
 
-  {/* ДВОРІВНЕВИЙ ЛЕЙБЛ — винесений правіше і вище іконки */}
-  <Box
-    sx={{
-      position: "absolute",
-      top: -8,
-      right: -18,          // було -4 — виніс правіше
-      transform: "none",   // можна 'translateX(0)' для ясності
-      display: "flex",
-      flexDirection: "column",
-      alignItems: "center",
-      gap: 0.2,
-      px: 0.7,
-      py: 0.5,
-      bgcolor: "#e11d48",
-      color: "#fff",
-      borderRadius: "8px",
-      minWidth: 20,
-      lineHeight: 1,
-      pointerEvents: "none", // щоб не заважав кліку
-      boxShadow: 2,
-    }}
-  >
-    <Typography sx={{ fontSize: 10, fontWeight: 800, m: 0, lineHeight: 1 }}>
-      {distinctCount}
-    </Typography>
-    <Typography sx={{ fontSize: 10, fontWeight: 800, m: 0, lineHeight: 1 }}>
-      {totalQty}
-    </Typography>
-  </Box>
-</IconButton>
+                {/* ОСОБИСТИЙ КАБІНЕТ (заглушка) */}
+                <IconButton
+                  onClick={profile}
+                  sx={{
+                    width: 44, height: 44, borderRadius: "22px",
+                    background: "linear-gradient(90deg, #023854 0%, #035B94 100%)",
+                    boxShadow: 2, color: "#fff",
+                    "&:hover": { opacity: 0.95, background: "linear-gradient(90deg, #023854 0%, #035B94 100%)" },
+                  }}
+                  aria-label="Особистий кабінет"
+                  title="Особистий кабінет"
+                >
+                  <AccountCircleIcon />
+                </IconButton>
+
+                {/* ВИЙТИ */}
+                <IconButton
+                  onClick={logout}
+                  sx={{
+                    width: 44, height: 44, borderRadius: "22px",
+                    background: "linear-gradient(90deg, #023854 0%, #035B94 100%)",
+                    boxShadow: 2, color: "#fff",
+                    "&:hover": { opacity: 0.95, background: "linear-gradient(90deg, #023854 0%, #035B94 100%)" },
+                  }}
+                  aria-label="Вийти"
+                  title="Вийти"
+                >
+                  <LogoutIcon />
+                </IconButton>
+              </>
             ) : (
               <Button
                 variant="contained"

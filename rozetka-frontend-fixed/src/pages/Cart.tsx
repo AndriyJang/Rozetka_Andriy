@@ -79,6 +79,7 @@ export default function Cart() {
   const isLg = useMediaQuery(theme.breakpoints.up("lg"));
   const isMd = useMediaQuery(theme.breakpoints.up("md"));
   const isSm = useMediaQuery(theme.breakpoints.up("sm"));
+  const [clearing, setClearing] = useState(false);
   const cols = isLg ? 6 : isMd ? 4 : isSm ? 3 : 2;
 
   const fetchCart = async () => {
@@ -209,6 +210,35 @@ export default function Cart() {
     });
     emitCartChanged();
   };
+  const clearCart = async () => {
+  if (items.length === 0 || clearing) return;
+  if (!confirm("Очистити весь кошик?")) return;
+
+  setClearing(true);
+  try {
+    const ids = items.map(i => i.productId);
+
+    // оптимістично спорожняємо список у UI
+    setItems([]);
+
+    // видаляємо поелементно існуючим ендпоінтом
+    await Promise.all(
+      ids.map(id =>
+        fetch(`${API}/api/Cart/RemoveCartItem/${id}`, {
+          method: "DELETE",
+          headers: new Headers(authHeaders()),
+        }).catch(() => null)
+      )
+    );
+  } finally {
+    setClearing(false);
+    // щоб оновився хедер/інші вкладки
+    try {
+      localStorage.setItem("cart:changed", String(Date.now()));
+      window.dispatchEvent(new Event("cart:changed"));
+    } catch {}
+  }
+};
 
   // Рекомендовано — рівно один ряд на всю ширину
   const cartCatIds = new Set(items.map((i) => Number(i.categoryId ?? 0)).filter(Boolean));
@@ -222,8 +252,18 @@ export default function Cart() {
     <Layout>
       <Container maxWidth="lg" sx={{ mt: 2, mb: 6 }}>
         <Typography variant="h5" sx={{ fontWeight: 800, mb: 2 }}>
-          Оформлення замовлення
-        </Typography>
+          Ваші замовлення                      
+          <Button
+        size="small"
+        variant="outlined"
+        color="error"
+        onClick={clearCart}
+        disabled={items.length === 0 || clearing}
+        sx={{ borderRadius: 999, px: 1.5, py: 0.3 , ml: 40 }}
+      >
+        {clearing ? "Очищення…" : "Очистити кошик"}
+      </Button>          
+        </Typography>        
 
         <Grid container spacing={2} alignItems="flex-start">
           {/* Ліва колонка — позиції */}
