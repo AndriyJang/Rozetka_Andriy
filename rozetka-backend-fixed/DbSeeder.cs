@@ -121,52 +121,39 @@ public static class DbSeeder
                 Console.WriteLine("Not Found File Users.json");
             }
         }
-        /*
-        if (!context.Users.Any())
+        if (!context.OrderStatuses.Any())
         {
-            var imageService = scope.ServiceProvider.GetRequiredService<IImageService>();
-            var jsonFile = Path.Combine(Directory.GetCurrentDirectory(), "Helpers", "JsonData", "Users.json");
-            if (File.Exists(jsonFile))
-            {
-                var jsonData = await File.ReadAllTextAsync(jsonFile);
-                try
+            context.OrderStatuses
+                .Add(new OrderStatusEntity
                 {
-                    var users = JsonSerializer.Deserialize<List<SeederUserModel>>(jsonData);
-                    foreach (var user in users)
-                    {
-                        var entity = mapper.Map<UserEntity>(user);
-                        entity.UserName = user.Email;
-                        entity.Image = await imageService.SaveImageFromUrlAsync(user.Image);
-                        var result = await userManager.CreateAsync(entity, user.Password);
-                        if (!result.Succeeded)
-                        {
-                            Console.WriteLine("Error Create User {0}", user.Email);
-                            continue;
-                        }
-                        foreach (var role in user.Roles)
-                        {
-                            if (await roleManager.RoleExistsAsync(role))
-                            {
-                                await userManager.AddToRoleAsync(entity, role);
-                            }
-                            else
-                            {
-                                Console.WriteLine("Not Found Role {0}", role);
-                            }
-                        }
-                    }
-
-                }
-                catch (Exception ex)
+                    Name = "Новий заказ"
+                });
+            context.OrderStatuses
+                .Add(new OrderStatusEntity
                 {
-                    Console.WriteLine("Error Json Parse Data {0}", ex.Message);
-                }
-            }
-            else
-            {
-                Console.WriteLine("Not Found File Users.json");
-            }
-        }     
-        */
+                    Name = "В роботі"
+                });
+            context.OrderStatuses
+                .Add(new OrderStatusEntity
+                {
+                    Name = "Відправлено"
+                });
+            context.OrderStatuses
+                .Add(new OrderStatusEntity
+                {
+                    Name = "Прибув"
+                });
+            context.OrderStatuses
+                .Add(new OrderStatusEntity
+                {
+                    Name = "Відхилено"
+                });
+            context.OrderStatuses
+                .Add(new OrderStatusEntity
+                {
+                    Name = "Отримано"
+                });
+            context.SaveChanges();
+        }
     }
 }
