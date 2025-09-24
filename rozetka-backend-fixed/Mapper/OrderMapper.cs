@@ -1,6 +1,7 @@
 ﻿using AutoMapper;
 using rozetkabackend.Data.Entities.Catalog;
 using rozetkabackend.Models.Order;
+using System;
 using System.Linq;
 
 namespace rozetkabackend.Mapper;
@@ -9,21 +10,21 @@ public class OrderMapper : Profile
 {
     public OrderMapper()
     {
-        CreateMap<OrderItemEntity, OrderItemModel>()
-            .ForMember(x => x.ProductImage, opt => opt
-                .MapFrom(x => x.Product!.ProductImages!.OrderBy(x => x.Priority).First().Name))
-            .ForMember(x => x.ProductName, opt => opt.MapFrom(x => x.Product!.Name))
-            .ForMember(x => x.ProductSlug, opt => opt.MapFrom(x => x.Product!.Slug));
+        CreateMap<OrderStatusEntity, OrderStatusItemViewModel>();
+        CreateMap<OrderAddViewModel, OrderEntity>()
+            .ForMember(x => x.DateCreated, opt => opt.MapFrom(x =>
+                DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Utc)))
+            .ForMember(x => x.OrderItems, opt => opt.Ignore());
 
-        CreateMap<OrderEntity, OrderModel>()
-            .ForMember(x => x.Status, opt => opt.MapFrom(x => x.OrderStatus!.Name));
+        CreateMap<OrderItemAddViewModel, OrderItemEntity>();
 
-        CreateMap<CartEntity, OrderItemEntity>()
-            .ForMember(x => x.PriceBuy, opt => opt
-            .MapFrom(x => x.Product!.Price))
-            .ForMember(x => x.Count, opt => opt
-            .MapFrom(x => x.Quantity));
+        CreateMap<OrderItemEntity, OrderItemViewModel>()
+            .ForMember(x => x.ProductName, opt => opt.MapFrom(x => x.Product.Name))
+            .ForMember(x => x.ProductImage, opt => opt.MapFrom(x => x.Product.ProductImages.Select(x => x.Name)));
 
-        //CreateMap<DeliveryInfoCreateModel, DeliveryInfoEntity>();
+        CreateMap<OrderEntity, OrderViewModel>()
+            .ForMember(x => x.DateCreated, opt => opt.MapFrom(x => x.DateCreated.ToString("dd.MM.yyyy HH:mm:ss")))
+            .ForMember(x => x.StatusName, opt => opt.MapFrom(x => x.OrderStatus.Name))
+            .ForMember(x => x.Items, opt => opt.MapFrom(x => x.OrderItems));
     }
 }
