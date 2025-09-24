@@ -2,11 +2,15 @@
 import Layout from "../components/Layout";
 import { useEffect, useMemo, useState } from "react";
 import {
-  TextField, Button, Container, Typography, Grid, Box, MenuItem, Select, FormControl, InputLabel,
+  TextField, Button, Container, Typography, Grid, Box,
+  MenuItem, Select, FormControl, InputLabel,
 } from "@mui/material";
 import { useSearchParams } from "react-router-dom";
 import ProductTile, { type ProductDto } from "../components/catalog/ProductTile";
+import IntroSplash from "../components/IntroSplash";
+import { AnimatePresence, motion } from "framer-motion";
 
+// ---------- types ----------
 type Product = {
   id: number;
   title?: string;
@@ -18,9 +22,19 @@ type Product = {
 };
 type Category = { id: number; name: string };
 
+type FiltersSnapshot = {
+  query: string;
+  minPrice: string;
+  maxPrice: string;
+  categoryId: string;
+  sort: "none" | "asc" | "desc";
+};
+
+// ---------- API base ----------
 const RAW_API = import.meta.env.VITE_API_URL ?? "";
 const API = RAW_API.replace(/\/+$/, "");
 
+// ---------- helpers ----------
 const toBaseName = (val?: string): string => {
   let v = String(val ?? "").trim();
   if (!v) return "";
@@ -44,23 +58,65 @@ const mapToTile = (x: Product): ProductDto => {
   };
 };
 
+// 5 різних варіантів анімацій (enter/exit)
+const FX = [
+  {
+    initial: { y: 24, opacity: 0 },
+    animate: { y: 0, opacity: 1 },
+    exit:    { y: -24, opacity: 0 },
+    transition: { type: "spring", stiffness: 380, damping: 28 }
+  },
+  {
+    initial: { x: 36, opacity: 0 },
+    animate: { x: 0,  opacity: 1 },
+    exit:    { x: -36, opacity: 0 },
+    transition: { type: "spring", stiffness: 360, damping: 26 }
+  },
+  {
+    initial: { scale: 0.9, opacity: 0 },
+    animate: { scale: 1,   opacity: 1 },
+    exit:    { scale: 0.92, opacity: 0 },
+    transition: { type: "spring", stiffness: 420, damping: 30 }
+  },
+  {
+    initial: { rotate: -6, y: 20, opacity: 0 },
+    animate: { rotate: 0,  y: 0,  opacity: 1 },
+    exit:    { rotate: 6,  y: -16, opacity: 0 },
+    transition: { type: "spring", stiffness: 360, damping: 24 }
+  },
+  {
+    initial: { rotateX: 35, scale: 0.96, opacity: 0 },
+    animate: { rotateX: 0,  scale: 1,    opacity: 1 },
+    exit:    { rotateX: -20, scale: 0.96, opacity: 0 },
+    transition: { type: "spring", stiffness: 300, damping: 24 }
+  },
+] as const;
+
 export default function ProductSearch() {
   const [searchParams, setSearchParams] = useSearchParams();
   const initial = searchParams.get("query") ?? "";
 
-  const [query, setQuery] = useState<string>(initial);
+  // дані
   const [results, setResults] = useState<Product[]>([]);
   const [all, setAll] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
 
+  // стан
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>("");
 
   // фільтри
+  const [query, setQuery] = useState<string>(initial);
   const [minPrice, setMinPrice] = useState<string>("");
   const [maxPrice, setMaxPrice] = useState<string>("");
   const [categoryId, setCategoryId] = useState<string>("");
   const [sort, setSort] = useState<"none" | "asc" | "desc">("none");
+  const [lastApplied, setLastApplied] = useState<FiltersSnapshot | null>(null);
+
+  // тизер (карусель однієї картки до натискання «Застосувати фільтри»)
+  const [teaserOn, setTeaserOn] = useState<boolean>(true);
+  const [teaserIdx, setTeaserIdx] = useState<number>(0);
+  const [teaserFxIdx, setTeaserFxIdx] = useState<number>(0);
 
   const token = useMemo(() => localStorage.getItem("token") ?? "", []);
   const buildHeaders = () => {
@@ -69,6 +125,7 @@ export default function ProductSearch() {
     return h;
   };
 
+  // завантаження довідників
   useEffect(() => {
     const loadAll = async () => {
       try {
@@ -86,6 +143,7 @@ export default function ProductSearch() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // локальний пошук/фільтр
   const filterLocal = (
     products: Product[], q: string, min: string, max: string, catId: string, srt: "none"|"asc"|"desc"
   ): Product[] => {
@@ -97,18 +155,18 @@ export default function ProductSearch() {
     let arr = products.filter(p => {
       const title = (p.title || p.name || "").toString().toLowerCase();
       const cat = (p.category?.name || "").toString().toLowerCase();
-      const byText = q ? (title.includes(ql) || cat.includes(ql)) : true; // порожній — усі
+      const byText  = q ? (title.includes(ql) || cat.includes(ql)) : true;
       const byPrice = Number(p.price) >= minV && Number(p.price) <= maxV;
-      const byCat = selCat ? (Number(p.category?.id ?? 0) === selCat) : true;
+      const byCat   = selCat ? (Number(p.category?.id ?? 0) === selCat) : true;
       return byText && byPrice && byCat;
     });
 
-    if (srt === "asc") arr = arr.slice().sort((a,b)=>Number(a.price)-Number(b.price));
-    else if (srt === "desc") arr = arr.slice().sort((a,b)=>Number(b.price)-Number(a.price));
-
+    if (srt === "asc")  arr = arr.slice().sort((a,b)=>Number(a.price)-Number(b.price));
+    if (srt === "desc") arr = arr.slice().sort((a,b)=>Number(b.price)-Number(a.price));
     return arr;
   };
 
+  // бекенд-пошук (коли вводимо текст)
   const runSearch = async (q: string) => {
     const s = q.trim();
     setSearchParams(s ? { query: s } : {});
@@ -126,13 +184,53 @@ export default function ProductSearch() {
     } finally { setLoading(false); }
   };
 
+  // якщо завантажилися з URL-початковим query — виконаємо пошук
   useEffect(() => { if (initial) runSearch(initial); /* eslint-disable-next-line */ }, []);
 
+  // Застосування фільтрів: ЗАВЖДИ від all + збереження snapshot
   const applyFilters = () => {
-    const base = results.length ? results : all;
-    const filtered = filterLocal(base, query, minPrice, maxPrice, categoryId, sort);
-    setResults(filtered);
+    const snap: FiltersSnapshot = { query, minPrice, maxPrice, categoryId, sort };
+    setLastApplied(snap);
+    setResults(filterLocal(all, snap.query, snap.minPrice, snap.maxPrice, snap.categoryId, snap.sort));
+    setTeaserOn(false); // ховаємо тизер після першого застосування
   };
+
+  // Якщо користувач встиг натиснути «Застосувати», а all догрузився пізніше —
+  // автоматично перераховуємо результати по збереженим фільтрам.
+  useEffect(() => {
+    if (lastApplied) {
+      setResults(
+        filterLocal(all, lastApplied.query, lastApplied.minPrice, lastApplied.maxPrice, lastApplied.categoryId, lastApplied.sort)
+      );
+    }
+  }, [all]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Тизер-карусель: міняємо товар кожні 1.8с
+  useEffect(() => {
+    if (!teaserOn) return;
+    const pool = (results.length ? results : all);
+    if (!pool.length) return;
+
+    const id = setInterval(() => {
+      setTeaserIdx((i) => (i + 1) % pool.length);
+    }, 1800);
+    return () => clearInterval(id);
+  }, [teaserOn, results, all]);
+
+  // На кожну зміну індексу — інша анімація (не повторюється підряд)
+  useEffect(() => {
+    setTeaserFxIdx(prev => {
+      let next = Math.floor(Math.random() * FX.length);
+      if (FX.length > 1 && next === prev) next = (next + 1) % FX.length;
+      return next;
+    });
+  }, [teaserIdx]);
+
+  const teaserPool = results.length ? results : all;
+  const currentTeaserTile: ProductDto | null =
+    teaserOn && teaserPool.length
+      ? mapToTile(teaserPool[teaserIdx % teaserPool.length])
+      : null;
 
   return (
     <Layout>
@@ -171,6 +269,27 @@ export default function ProductSearch() {
           <Box sx={{ display: { xs: "block", md: "none" } }} />
           <Button variant="contained" onClick={applyFilters}>Застосувати фільтри</Button>
         </Box>
+
+        {/* Тизер: одна картка з рандомною анімацією під кнопкою до першого застосування фільтрів */}
+        {teaserOn && currentTeaserTile && (
+          <IntroSplash open inline title="Нуворра це круто!!!">
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div
+                key={`${currentTeaserTile.id}-${teaserIdx}`}
+                initial={FX[teaserFxIdx].initial}
+                animate={FX[teaserFxIdx].animate}
+                exit={FX[teaserFxIdx].exit}
+                transition={FX[teaserFxIdx].transition}
+              >
+                <Box sx={{ display: "grid", placeItems: "center" }}>
+                  <Box sx={{ width: "min(360px, 100%)" }}>
+                    <ProductTile p={currentTeaserTile} />
+                  </Box>
+                </Box>
+              </motion.div>
+            </AnimatePresence>
+          </IntroSplash>
+        )}
 
         {/* Результати — картки ProductTile */}
         <Grid container spacing={2} sx={{ mt: 2 }}>

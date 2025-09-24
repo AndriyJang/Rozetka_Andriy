@@ -4,6 +4,7 @@ import { Container, Grid, Typography, Box } from "@mui/material";
 import { useEffect, useMemo, useState, useRef, useLayoutEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 
+
 // Компоненти
 import CategorySidebar from "../components/catalog/CategorySidebar";
 import ProductTile from "../components/catalog/ProductTile";
