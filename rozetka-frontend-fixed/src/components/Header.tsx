@@ -1,14 +1,15 @@
 // src/components/Header.tsx
 import {
-  AppBar, Toolbar, Typography, Button, InputBase, Box, IconButton
+  AppBar, Toolbar, Typography, Button, InputBase, Box, IconButton, Popover
 } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
 import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
 import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
-import LogoutIcon from "@mui/icons-material/Logout";              // ⬅️ додано
-import AccountCircleIcon from "@mui/icons-material/AccountCircle"; // ⬅️ додано
+import LogoutIcon from "@mui/icons-material/Logout";
+import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import { useNavigate, useLocation } from "react-router-dom";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import AboutNuvora from "./AboutNuvora";
 
 type Role = "Guest" | "User" | "Admin";
 
@@ -37,10 +38,11 @@ export default function Header() {
   const [token, setToken] = useState<string>(() => localStorage.getItem("token") ?? "");
   const role: Role = useMemo(() => getRoleFromToken(token), [token]);
 
-  // counters
+  // cart counters
   const [distinctCount, setDistinctCount] = useState(0);
   const [totalQty, setTotalQty] = useState(0);
 
+  // search box behavior
   const isSearchPage = location.pathname.startsWith("/product-search");
   const placeholder = isSearchPage ? "на головну" : "Я шукаю...";
 
@@ -62,7 +64,11 @@ export default function Header() {
         setDistinctCount(0);
         setTotalQty(0);
       }
-    } catch {}
+    } catch {
+      // ignore network errors for the header counters
+      setDistinctCount(0);
+      setTotalQty(0);
+    }
   };
 
   useEffect(() => {
@@ -83,29 +89,49 @@ export default function Header() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
- const logout = () => {
-  try {
-    // 1) прибираємо автентифікацію
-    localStorage.removeItem("token");
-    localStorage.removeItem("roles");
+  const logout = () => {
+    try {
+      localStorage.removeItem("token");
+      localStorage.removeItem("roles");
+      setToken("");
+      setDistinctCount(0);
+      setTotalQty(0);
+      localStorage.setItem("cart:changed", String(Date.now()));
+      window.dispatchEvent(new Event("cart:changed"));
+      window.dispatchEvent(new StorageEvent("storage", { key: "token" }));
+    } catch {}
+    navigate("/home", { replace: true });
+  };
 
-    // 2) синхронно оновлюємо локальний стан, щоб роль одразу стала Guest
-    setToken("");
-
-    // 3) скидаємо бейдж кошика і повідомляємо слухачів
-    setDistinctCount(0);
-    setTotalQty(0);
-    localStorage.setItem("cart:changed", String(Date.now()));
-    window.dispatchEvent(new Event("cart:changed"));
-    window.dispatchEvent(new StorageEvent("storage", { key: "token" }));
-  } catch {}
-
-  // 4) редірект на головну
-  navigate("/home", { replace: true });
-};
-
+  // ✅ Профіль: якщо немає токена — на /login з поверненням у кабінет; якщо є — у /account-my
   const profile = () => {
-    navigate("/profile"); // заглушка, зробите сторінку — підставите
+    const hasToken = !!localStorage.getItem("token");
+    if (!hasToken) {
+      navigate("/login", { state: { returnTo: "/account-my", from: location.pathname } });
+      return;
+    }
+    navigate("/account-my");
+  };
+
+  /* ---------- Hover About (Popover) із невеликою затримкою ---------- */
+  const [aboutAnchor, setAboutAnchor] = useState<HTMLElement | null>(null);
+  const closeTimer = useRef<number | null>(null);
+
+  const openAbout = Boolean(aboutAnchor);
+
+  const openNow = (el: HTMLElement) => {
+    if (closeTimer.current) { window.clearTimeout(closeTimer.current); closeTimer.current = null; }
+    setAboutAnchor(el);
+  };
+  const scheduleClose = () => {
+    if (closeTimer.current) window.clearTimeout(closeTimer.current);
+    closeTimer.current = window.setTimeout(() => {
+      setAboutAnchor(null);
+      closeTimer.current = null;
+    }, 180);
+  };
+  const cancelClose = () => {
+    if (closeTimer.current) { window.clearTimeout(closeTimer.current); closeTimer.current = null; }
   };
 
   return (
@@ -119,7 +145,9 @@ export default function Header() {
             </IconButton>
             <Typography
               variant="h6"
-              sx={{ fontFamily: "Montserrat", fontWeight: "bold", fontSize: 32, color: "#023854" }}
+              onMouseEnter={(e) => openNow(e.currentTarget)}
+              onMouseLeave={scheduleClose}
+              sx={{ fontFamily: "Montserrat", fontWeight: "bold", fontSize: 32, color: "#023854", cursor: "default" }}
             >
               NUVORA
             </Typography>
@@ -132,8 +160,8 @@ export default function Header() {
             <InputBase
               placeholder={placeholder}
               readOnly
-              onClick={() => { if (isSearchPage) navigate("/home"); }}     // ⬅️ на сторінці пошуку — перехід ПО КЛІКУ
-              onMouseEnter={() => { if (!isSearchPage) navigate("/product-search"); }} // ⬅️ на інших — по hover на пошук
+              onClick={() => { if (isSearchPage) navigate("/home"); }}
+              onMouseEnter={() => { if (!isSearchPage) navigate("/product-search"); }}
               sx={{
                 backgroundColor: "#EFF3F3",
                 borderRadius: "20px",
@@ -165,8 +193,7 @@ export default function Header() {
                   boxShadow: 2, color: "#fff",
                   "&:hover": { opacity: 0.95, background: "linear-gradient(90deg, #023854 0%, #035B94 100%)" },
                 }}
-                aria-label="Адмін"
-                title="Адмін"
+                aria-label="Адмін" title="Адмін"
               >
                 <AdminPanelSettingsIcon />
               </IconButton>
@@ -181,11 +208,9 @@ export default function Header() {
                     position: "relative",
                     "&:hover": { opacity: 0.95, background: "linear-gradient(90deg, #023854 0%, #035B94 100%)" },
                   }}
-                  aria-label="Кошик"
-                  title="Кошик"
+                  aria-label="Кошик" title="Кошик"
                 >
                   <ShoppingCartIcon />
-                  {/* двоповерхова бейджа */}
                   <Box
                     sx={{
                       position: "absolute", top: -8, right: -18,
@@ -203,7 +228,6 @@ export default function Header() {
                   </Box>
                 </IconButton>
 
-                {/* ОСОБИСТИЙ КАБІНЕТ (заглушка) */}
                 <IconButton
                   onClick={profile}
                   sx={{
@@ -212,13 +236,11 @@ export default function Header() {
                     boxShadow: 2, color: "#fff",
                     "&:hover": { opacity: 0.95, background: "linear-gradient(90deg, #023854 0%, #035B94 100%)" },
                   }}
-                  aria-label="Особистий кабінет"
-                  title="Особистий кабінет"
+                  aria-label="Особистий кабінет" title="Особистий кабінет"
                 >
                   <AccountCircleIcon />
                 </IconButton>
 
-                {/* ВИЙТИ */}
                 <IconButton
                   onClick={logout}
                   sx={{
@@ -227,8 +249,7 @@ export default function Header() {
                     boxShadow: 2, color: "#fff",
                     "&:hover": { opacity: 0.95, background: "linear-gradient(90deg, #023854 0%, #035B94 100%)" },
                   }}
-                  aria-label="Вийти"
-                  title="Вийти"
+                  aria-label="Вийти" title="Вийти"
                 >
                   <LogoutIcon />
                 </IconButton>
@@ -252,6 +273,22 @@ export default function Header() {
           </Box>
         </Box>
       </Toolbar>
+
+      {/* Popover з AboutNuvora */}
+      <Popover
+        open={openAbout}
+        anchorEl={aboutAnchor}
+        onClose={() => setAboutAnchor(null)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+        transformOrigin={{ vertical: "top", horizontal: "left" }}
+        PaperProps={{ sx: { mt: 1, borderRadius: 3, p: 0, border: "1px solid rgba(2,56,84,0.08)", maxWidth: 720 } }}
+        onMouseEnter={cancelClose}
+        onMouseLeave={scheduleClose}
+      >
+        <Box sx={{ p: { xs: 2, md: 3 }, width: { xs: 360, sm: 560, md: 720 } }}>
+          <AboutNuvora />
+        </Box>
+      </Popover>
     </AppBar>
   );
 }

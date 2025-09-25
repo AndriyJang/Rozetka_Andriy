@@ -11,6 +11,7 @@ using rozetkabackend.Models.Order;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Security.Claims;
 
 namespace rozetkabackend.Controllers
 {
@@ -31,6 +32,18 @@ namespace rozetkabackend.Controllers
             _context = context;
             _mapper = mapper;
             _userManager = userManager;
+        }
+        private async Task<UserEntity?> GetCurrentUserAsync()
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!string.IsNullOrEmpty(userId))
+                return await _userManager.FindByIdAsync(userId);
+
+            var email = User.FindFirstValue(ClaimTypes.Email) ?? User.Identity?.Name;
+            if (!string.IsNullOrEmpty(email))
+                return await _userManager.FindByEmailAsync(email);
+
+            return null;
         }
 
         [HttpGet]
@@ -60,13 +73,13 @@ namespace rozetkabackend.Controllers
         {
             try
             {
-                string userName = User.Claims.FirstOrDefault().Value;
-                var user = await _userManager.FindByEmailAsync(userName);
+                var user = await GetCurrentUserAsync();
+                if (user == null) return Unauthorized();
 
                 var entity = _mapper.Map<OrderEntity>(model);
                 entity.UserId = user.Id;
                 _context.Orders.Add(entity);
-                _context.SaveChanges();
+                await _context.SaveChangesAsync();
 
                 var entityItems = model.OrderItems.Select(x => _mapper.Map<OrderItemEntity>(x));
                 foreach (var item in entityItems)
@@ -74,19 +87,16 @@ namespace rozetkabackend.Controllers
                     item.OrderId = entity.Id;
                     _context.OrderItems.Add(item);
                 }
-                _context.SaveChanges();
+                await _context.SaveChangesAsync();
 
-                var cartData = _context.Carts.Where(x => x.UserId == user.Id).ToArray();
+                var cartData = await _context.Carts.Where(x => x.UserId == user.Id).ToListAsync();
                 _context.Carts.RemoveRange(cartData);
-                _context.SaveChanges();
+                await _context.SaveChangesAsync();
                 return Ok();
             }
             catch (Exception ex)
             {
-                return BadRequest(new
-                {
-                    invalid = ex.Message
-                });
+                return BadRequest(new { invalid = ex.Message });
             }
         }
 
@@ -137,15 +147,16 @@ namespace rozetkabackend.Controllers
             }
         }
 
+
         [HttpGet]
         [Route("user/list")]
         public async Task<IActionResult> UserList()
         {
             try
             {
-                string userName = User.Claims.FirstOrDefault().Value;
-                var user = await _userManager.FindByEmailAsync(userName);
-                //Thread.Sleep(2000);
+                var user = await GetCurrentUserAsync();
+                if (user == null) return Unauthorized();
+
                 var model = await _context.Orders
                     .Include(x => x.OrderItems).ThenInclude(x => x.Product).ThenInclude(x => x.ProductImages)
                     .Include(x => x.OrderStatus)
@@ -153,14 +164,12 @@ namespace rozetkabackend.Controllers
                     .OrderByDescending(x => x.DateCreated)
                     .Select(x => _mapper.Map<OrderViewModel>(x))
                     .ToListAsync();
+
                 return Ok(model);
             }
             catch (Exception ex)
             {
-                return BadRequest(new
-                {
-                    invalid = ex.Message
-                });
+                return BadRequest(new { invalid = ex.Message });
             }
         }
     }

@@ -20,6 +20,7 @@ import StarIcon from "@mui/icons-material/Star";
 import { useEffect, useMemo, useState } from "react";
 import ProductTile from "../components/catalog/ProductTile";
 import type { ProductDto } from "../components/catalog/ProductTile";
+import { useNavigate } from "react-router-dom";
 
 type CartItem = {
   productId: number;
@@ -69,6 +70,7 @@ const imgFromCartItem = (it: CartItem): string => {
 export default function Cart() {
   const [items, setItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
   const [allProducts, setAllProducts] = useState<
     (ProductDto & { categoryId?: number })[]
   >([]);
@@ -401,7 +403,7 @@ export default function Cart() {
                       background: "linear-gradient(90deg, #023854 0%, #035B94 100%)",
                     },
                   }}
-                  onClick={() => alert("Далі — оформлення/доставка")}
+                  onClick={() => navigate("/order")}
                 >
                   Оформити замовлення
                 </Button>

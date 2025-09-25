@@ -223,7 +223,11 @@ export default function Admin() {
               Категорії
             </Button>
           </Grid>
-
+          <Grid item xs={12} md={4}>
+            <Button fullWidth variant="contained" component={RouterLink} to="/orders" sx={btnSx(isActive("/orders"))}>
+              Замовлення
+            </Button>
+          </Grid>
           <Grid item xs={12} md="auto">
             <Button variant="outlined" startIcon={<LogoutIcon />} onClick={logout} sx={smallBtnSx}>
               Вийти

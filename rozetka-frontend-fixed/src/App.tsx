@@ -12,6 +12,11 @@ import OAuthCallback from "./pages/OAuthCallback";
 import Cart from "./pages/Cart";
 import ProductDetails from "./pages/ProductDetails"; //  новий імпорт
 import ToastHost from "./components/ToastHost";
+import AccountMy from "./pages/account/AccountMy";
+import OrderHistory from "./pages/account/OrderHistory";
+import Order from "./pages/Order";
+import OrderDetails from "./pages/account/OrderDetails";
+import OrdersAdmin from "./pages/OrdersAdmin";
 
 export default function App() {
   return (
@@ -30,6 +35,11 @@ export default function App() {
       <Route path="/categorie" element={<Categorie />} />
       <Route path="/oauth-callback" element={<OAuthCallback />} />
       <Route path="/cart" element={<Cart />} />
+      <Route path="/account-my" element={<AccountMy/>} />      
+      <Route path="/account/order-history" element={<OrderHistory/>} />
+      <Route path="/order" element={<Order />} />
+      <Route path="/account/order/:id" element={<OrderDetails />} />
+      <Route path="/orders" element={<OrdersAdmin />} />
       <Route path="*" element={<div style={{ padding: 24 }}>Page not found</div>} />
     </Routes>
     <ToastHost />

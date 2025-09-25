@@ -1,74 +1,97 @@
 // src/pages/Home.tsx
 import Layout from "../components/Layout";
 import { Container, Grid, Typography, Box } from "@mui/material";
-import { useEffect, useMemo, useState, useRef, useLayoutEffect } from "react";
+import React, { useEffect, useMemo, useState, useRef, Suspense } from "react";
 import { useSearchParams } from "react-router-dom";
 
-
-// Компоненти
 import CategorySidebar from "../components/catalog/CategorySidebar";
 import ProductTile from "../components/catalog/ProductTile";
-import AboutNuvora from "../components/AboutNuvora";
+// ⚡️ ліниве завантаження блоку "Про Нуворру"
+const AboutNuvora = React.lazy(() => import("../components/AboutNuvora"));
 
-// Типи (type-only)
 import type { CategoryDto } from "../components/catalog/CategorySidebar";
 import type { ProductDto } from "../components/catalog/ProductTile";
 
+/* ===================== helpers ===================== */
 const RAW_API = import.meta.env.VITE_API_URL || "";
 const API = RAW_API.replace(/\/+$/, "");
 
-// Нормалізація імен зображень
 const toBaseName = (val?: string): string => {
   let v = String(val ?? "").trim();
   if (!v) return "";
-  v = v.replace(/^https?:\/\/[^/]+/i, "");
-  v = v.replace(/^\/+/, "");
+  v = v.replace(/^https?:\/\/[^/]+/i, "").replace(/^\/+/, "");
   if (v.startsWith("images/")) v = v.slice(7);
-  v = (v.split("/").pop() ?? v);
-  v = v.replace(/^\d+_/, "");
+  v = (v.split("/").pop() ?? v).replace(/^\d+_/, "");
   return v;
 };
 
-// API -> ProductTile DTO (прокидуємо description, brand тощо + categoryId для фільтра)
 function mapApiProduct(x: any): ProductDto & { categoryId?: number } {
   const imgs = Array.isArray(x?.productImages) ? x.productImages : [];
   const ordered = imgs.slice().sort((a: any, b: any) => (a?.priority ?? 0) - (b?.priority ?? 0));
   const images: string[] = ordered.map((i: any) => toBaseName(i?.name)).filter(Boolean);
   const categoryId = Number(x?.category?.id ?? x?.categoryId ?? 0) || undefined;
-
   return {
     id: Number(x?.id ?? 0),
     name: String(x?.name ?? x?.title ?? "Товар"),
     title: String(x?.title ?? ""),
     price: Number(x?.price ?? 0),
-
     images,
     image: x?.image ?? null,
     imageUrl: x?.imageUrl ?? null,
     imagePath: x?.imagePath ?? null,
-
-    // ⬇️ важливо: опис і додаткові поля, щоб картка могла їх показати в "Більше"
     description: typeof x?.description === "string" ? x.description : "",
     brand: x?.brand ?? "",
     brandSite: x?.brandSite ?? "",
     size: x?.size ?? "",
     color: x?.color ?? "",
     year: x?.year ?? "",
-
-    // для фільтру:
     categoryId,
   } as ProductDto & { categoryId?: number };
 }
 
+// простий кеш у localStorage
+const CKEY_CATS = "home:v1:categories";
+const CKEY_PROD = "home:v1:products";
+const TTL_MS = 10 * 60 * 1000; // 10 хв
+
+function readCache<T>(key: string, maxAgeMs: number): T | null {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const { ts, data } = JSON.parse(raw) as { ts: number; data: T };
+    if (Date.now() - ts > maxAgeMs) return null;
+    return data;
+  } catch {
+    return null;
+  }
+}
+function writeCache<T>(key: string, data: T) {
+  try {
+    localStorage.setItem(key, JSON.stringify({ ts: Date.now(), data }));
+  } catch {}
+}
+
+/* ===================== page ===================== */
 export default function Home() {
   const token = useMemo(() => localStorage.getItem("token") ?? "", []);
   const authHeaders: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
 
-  const [categories, setCategories] = useState<CategoryDto[]>([]);
-  const [products, setProducts] = useState<(ProductDto & { categoryId?: number })[]>([]);
-  const [loading, setLoading] = useState(true);
+  // 1) миттєвий старт з кешу (якщо є)
+  const [categories, setCategories] = useState<CategoryDto[]>(
+    readCache<CategoryDto[]>(CKEY_CATS, TTL_MS) ?? []
+  );
+  const [allProducts, setAllProducts] = useState<(ProductDto & { categoryId?: number })[]>(
+    readCache<(ProductDto & { categoryId?: number })[]>(CKEY_PROD, TTL_MS) ?? []
+  );
 
-  // URL-параметр ?cat=<id>, null => усі товари
+  // інкрементальний рендер: спочатку 20, далі дорисовуємо
+  const [visibleCount, setVisibleCount] = useState<number>(20);
+  const [loading, setLoading] = useState(categories.length === 0 || allProducts.length === 0);
+
+  // ❗️ показувати AboutNuvora після першого екрану (відкладено)
+  const [showAbout, setShowAbout] = useState(false);
+
+  // URL ?cat=<id> (за замовчуванням — усі)
   const [searchParams, setSearchParams] = useSearchParams();
   const activeCatId = useMemo(() => {
     const raw = searchParams.get("cat");
@@ -76,54 +99,132 @@ export default function Home() {
     return Number.isFinite(n) && n > 0 ? n : null;
   }, [searchParams]);
 
+  // 2) SWR: підтягуємо «живі» дані, оновлюємо, кладемо в кеш
   useEffect(() => {
-    Promise.all([
-      fetch(`${API}/api/Categories`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
-      fetch(`${API}/api/Products`,   { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
-    ])
-      .then(([cats, prods]) => {
+    let aborted = false;
+    (async () => {
+      try {
+        const [cr, pr] = await Promise.all([
+          fetch(`${API}/api/Categories`, { headers: authHeaders }),
+          fetch(`${API}/api/Products`, { headers: authHeaders }),
+        ]);
+        const cats = cr.ok ? await cr.json() : [];
+        const prods = pr.ok ? await pr.json() : [];
+
+        if (aborted) return;
+
+        const mapped = (Array.isArray(prods) ? prods : []).map(mapApiProduct);
         setCategories(Array.isArray(cats) ? cats : []);
-        setProducts((Array.isArray(prods) ? prods : []).map(mapApiProduct));
-      })
-      .finally(() => setLoading(false));
-  }, [API]); // token мемоізований; authHeaders стабільні
+        setAllProducts(mapped);
+        // якщо прийшло менше 20 — все одно показуємо наявне
+        setVisibleCount((v) => Math.min(Math.max(v, 20), mapped.length));
+        writeCache(CKEY_CATS, Array.isArray(cats) ? cats : []);
+        writeCache(CKEY_PROD, mapped);
+      } finally {
+        if (!aborted) setLoading(false);
+      }
+    })();
+    return () => {
+      aborted = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [API]);
 
-  // Фільтр по категорії
-  const filtered = activeCatId
-    ? products.filter(p => (p.categoryId ?? 0) === activeCatId)
-    : products;
+  // 3) дорендерюємо решту пакетами по 20 у вільний час/після ідлу
+  useEffect(() => {
+    if (allProducts.length <= visibleCount) return;
 
-  // Перший ряд праворуч (3 картки), решта — нижче
+    let cancelled = false;
+    const step = () => {
+      if (cancelled) return;
+      setVisibleCount((c) => {
+        if (c >= allProducts.length) return c;
+        return Math.min(c + 20, allProducts.length);
+      });
+    };
+
+    const ric = (window as any).requestIdleCallback as
+      | ((cb: () => void, opts?: { timeout?: number }) => number)
+      | undefined;
+
+    const id = ric ? ric(step, { timeout: 700 }) : window.setTimeout(step, 200);
+    return () => {
+      cancelled = true;
+      if (ric) (window as any).cancelIdleCallback?.(id);
+      else clearTimeout(id);
+    };
+  }, [allProducts.length, visibleCount]);
+
+  // 4) підвантаження при доскролі до «хвоста»
+  const tailRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!tailRef.current) return;
+    const el = tailRef.current;
+    const io = new IntersectionObserver(
+      (ents) => {
+        if (ents.some((e) => e.isIntersecting)) {
+          setVisibleCount((c) => Math.min(c + 20, allProducts.length));
+        }
+      },
+      { rootMargin: "600px 0px" }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [allProducts.length]);
+
+  // після того як перший екран уже змонтований — показати AboutNuvora у «вільний час»
+  useEffect(() => {
+    if (loading) return;
+    const show = () => setShowAbout(true);
+    const ric = (window as any).requestIdleCallback as
+      | ((cb: () => void, opts?: { timeout?: number }) => number)
+      | undefined;
+    const id = ric ? ric(show, { timeout: 1200 }) : window.setTimeout(show, 600);
+    return () => {
+      if (ric) (window as any).cancelIdleCallback?.(id);
+      else clearTimeout(id);
+    };
+  }, [loading]);
+
+  // фільтр по категорії
+  const filtered = useMemo(() => {
+    return activeCatId
+      ? allProducts.filter((p) => (p.categoryId ?? 0) === activeCatId)
+      : allProducts;
+  }, [allProducts, activeCatId]);
+
+  // перший ряд праворуч (3), решта — нижче
   const splitAt = 3;
-  const topProducts  = filtered.slice(0, splitAt);
-  const restProducts = filtered.slice(splitAt);
+  const topProducts = filtered.slice(0, splitAt);
+  const restProducts = filtered.slice(splitAt, visibleCount);
 
-  // Вимір правого верхнього блоку (заголовок + перший ряд) для точного вирівнювання сайдбара
+  // точне вирівнювання висоти сайдбара (через ResizeObserver)
   const rightBlockRef = useRef<HTMLDivElement | null>(null);
   const [rightBlockH, setRightBlockH] = useState(0);
-
-  const measure = () => { if (rightBlockRef.current) setRightBlockH(rightBlockRef.current.offsetHeight); };
-  useLayoutEffect(() => { requestAnimationFrame(measure); }, [filtered, loading]);
   useEffect(() => {
-    const onResize = () => measure();
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
+    if (!rightBlockRef.current) return;
+    const ro = new ResizeObserver((entries) => {
+      for (const e of entries) setRightBlockH(e.contentRect.height);
+    });
+    ro.observe(rightBlockRef.current);
+    return () => ro.disconnect();
   }, []);
 
-  const GRID_SPACING = 2;          // для всіх Grid
-  const SIDEBAR_PY = 32;           // p:2 у Paper => 16 + 16
+  const GRID_SPACING = 2;
+  const SIDEBAR_PY = 32;
 
-  // Клік по категорії в сайдбарі
   const handleSelectCategory = (id: number | null) => {
     if (id && id > 0) setSearchParams({ cat: String(id) }, { replace: true });
-    else setSearchParams({}, { replace: true }); // показати всі
+    else setSearchParams({}, { replace: true });
+    // при зміні категорії повернемо видимий ліміт до стартових 20
+    setVisibleCount(20);
   };
 
   return (
     <Layout>
       <Container maxWidth="lg">
         <Grid container spacing={GRID_SPACING} alignItems="stretch">
-          {/* Сайдбар: точна висота = правий верхній блок - внутрішні відступи Paper */}
+          {/* Сайдбар */}
           <Grid item xs={12} lg={3} sx={{ display: "flex" }}>
             <Box sx={{ width: "100%", height: "100%" }}>
               <CategorySidebar
@@ -135,7 +236,7 @@ export default function Home() {
             </Box>
           </Grid>
 
-          {/* Правий верхній блок: заголовок по центру над другою карткою + перший ряд */}
+          {/* Правий верхній блок + перший ряд */}
           <Grid item xs={12} lg={9}>
             <Box ref={rightBlockRef}>
               <Grid container spacing={GRID_SPACING} sx={{ mb: 1 }}>
@@ -151,7 +252,7 @@ export default function Home() {
                 <Grid item xs={false} md={4} />
               </Grid>
 
-              {loading ? (
+              {loading && allProducts.length === 0 ? (
                 <Typography color="text.secondary">Завантаження…</Typography>
               ) : (
                 <Grid container spacing={GRID_SPACING}>
@@ -165,9 +266,9 @@ export default function Home() {
             </Box>
           </Grid>
 
-          {/* Решта карток — підтягнуто ближче, без великого зазору */}
-          {!loading && restProducts.length > 0 && (
-            <Grid item xs={12} sx={{ mt: -1 /* -8px; за потреби зроби -2 */ }}>
+          {/* Решта карток — інкрементальний рендер */}
+          {restProducts.length > 0 && (
+            <Grid item xs={12} sx={{ mt: -1 }}>
               <Grid container spacing={GRID_SPACING}>
                 {restProducts.map((p) => (
                   <Grid item key={p.id} xs={12} sm={6} md={4} lg={3}>
@@ -177,14 +278,23 @@ export default function Home() {
               </Grid>
             </Grid>
           )}
-        </Grid>
 
-        {/* Низ: AboutNuvora */}
-        <Grid container>
-          <Grid item xs={12} sx={{ mt: 3 }}>
-            <AboutNuvora />
+          {/* хвіст для доскрол-підвантаження */}
+          <Grid item xs={12}>
+            <div ref={tailRef} />
           </Grid>
         </Grid>
+
+        {/* Низ: AboutNuvora — ЛІНИВО і ПІСЛЯ першої відмальовки */}
+        {showAbout && (
+          <Suspense fallback={null}>
+            <Grid container>
+              <Grid item xs={12} sx={{ mt: 3 }}>
+                <AboutNuvora />
+              </Grid>
+            </Grid>
+          </Suspense>
+        )}
       </Container>
     </Layout>
   );

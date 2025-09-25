@@ -8,7 +8,6 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
-import CircleIcon from "@mui/icons-material/Circle";
 import { Link as RouterLink, useNavigate } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "../../components/ToastHost";
@@ -203,6 +202,8 @@ export default function ProductTile({ p }: { p: ProductDto }) {
               component="img"
               src={curSrc}
               alt={title}
+              loading="lazy"        
+              decoding="async"   
               sx={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
               onError={onImgError}
             />
@@ -369,6 +370,8 @@ export default function ProductTile({ p }: { p: ProductDto }) {
                   component="img"
                   src={curSrc}
                   alt={title}
+                  loading="lazy"         
+                  decoding="async"   
                   sx={{ width: "100%", maxWidth: 360, height: "auto", objectFit: "contain" }}
                   onError={onImgError}
                 />
