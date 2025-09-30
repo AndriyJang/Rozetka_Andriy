@@ -192,8 +192,8 @@ export default function OrderHistory() {
                         >
                           Переглянути замовлення
                         </Button>
-                        <Link component={RouterLink} to="/account-my?tab=track" sx={{ fontSize: 14, alignSelf: "center" }}>
-                          Відстежити
+                        <Link component={RouterLink} to={`/account-my?tab=track&orderId=${o.id}`} sx={{ fontSize: 14, alignSelf: "center" }}>
+                           Відстежити
                         </Link>
                       </Stack>
                     </CardContent>

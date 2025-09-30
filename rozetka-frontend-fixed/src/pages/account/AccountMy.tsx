@@ -1,3 +1,4 @@
+// src/pages/account/AccountMy.tsx
 import React from "react";
 import Layout from "../../components/Layout";
 import { useNavigate, useSearchParams, Link as RouterLink } from "react-router-dom";
@@ -19,6 +20,13 @@ type TabKey = "dashboard" | "my-data" | "track";
 
 const RAW_API = import.meta.env.VITE_API_URL ?? "";
 const API = RAW_API.replace(/\/+$/, "");
+
+// ✅ Хелпер: повертає Headers, де Authorization додається лише якщо є token
+const makeAuthHeaders = (token?: string): Headers => {
+  const h = new Headers();
+  if (token) h.set("Authorization", `Bearer ${token}`);
+  return h;
+};
 
 export default function AccountMy() {
   const navigate = useNavigate();
@@ -78,7 +86,12 @@ export default function AccountMy() {
           <Card elevation={0} sx={{ borderRadius: 3, p: 2 }}>
             {tab === "dashboard" && <Dashboard />}
             {tab === "my-data"  && <MyData />}
-            {tab === "track"    && <Track />}
+            {tab === "track" && (
+              <Track
+                key={`track-${sp.get("orderId") ?? ""}`}
+                initialOrderId={sp.get("orderId") ?? ""}
+              />
+            )}
           </Card>
         </Box>
       </Container>
@@ -95,7 +108,8 @@ export default function AccountMy() {
 /* --------------------------- DASHBOARD --------------------------- */
 function Dashboard() {
   const token = React.useMemo(() => localStorage.getItem("token") ?? "", []);
-  const authHeaders: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+  const authHeaders = React.useMemo(() => makeAuthHeaders(token), [token]);
+
   const [last, setLast] = React.useState<null | { id: number; statusName: string }>(null);
 
   React.useEffect(() => {
@@ -108,7 +122,7 @@ function Dashboard() {
       } catch {}
     })();
     return () => { aborted = true; };
-  }, []);
+  }, [authHeaders]);
 
   const user = { name: "Андрій", email: "andri@gmail.com", phone: "+380 (000) 123-4567", level: "Срібний учасник", joinDate: "12 липня 2025" };
 
@@ -142,9 +156,12 @@ function Dashboard() {
               <Box>
                 <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Останнє замовлення</Typography>
                 {last ? (
-                  <Typography variant="body2" color="text.secondary">
-                    Замовлення #{last.id} — <Chip size="small" label={last.statusName} sx={{ ml: 0.5 }} />
-                  </Typography>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <Typography variant="body2" color="text.secondary">
+                      Замовлення #{last.id} —
+                    </Typography>
+                    <Chip size="small" label={last.statusName} />
+                  </Stack>
                 ) : (
                   <Typography variant="body2" color="text.secondary">
                     тут мають бути ваші замовлення, дякуємо за співпрацю
@@ -153,7 +170,14 @@ function Dashboard() {
               </Box>
               <Stack direction="row" spacing={1}>
                 <Button size="small" component={RouterLink} to="/account/order-history" variant="outlined">Переглянути</Button>
-                <Button size="small" component={RouterLink} to="/account-my?tab=track" variant="contained">Відстежити</Button>
+                <Button
+                  size="small"
+                  component={RouterLink}
+                  to={last ? `/account-my?tab=track&orderId=${last.id}` : `/account-my?tab=track`}
+                  variant="contained"
+                >
+                  Відстежити
+                </Button>
               </Stack>
             </Stack>
           </CardContent>
@@ -209,34 +233,55 @@ function MyData() {
         </Stack>
         <TextField fullWidth label="Номер відділення" name="branch" value={form.branch} onChange={onChange} />
         <Box><Button variant="contained" onClick={() => alert("(Заглушка) Дані збережено")}>Зберегти зміни</Button></Box>
-        <Chip label="Зміну пароля прибрано (не потрібно)" />
       </Stack>
     </>
   );
 }
 
 /* --------------------------- TRACK ORDER ------------------------- */
-function Track() {
+function Track({ initialOrderId = "" }: { initialOrderId?: string }) {
   const token = React.useMemo(() => localStorage.getItem("token") ?? "", []);
-  const authHeaders: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+  const authHeaders = React.useMemo(() => makeAuthHeaders(token), [token]);
 
-  const [orderId, setOrderId] = React.useState("1000");
+  const [orderId, setOrderId] = React.useState(initialOrderId);
   const [lookup, setLookup] = React.useState<null | { id: number; statusName: string; dateCreated: string }>(null);
   const [notFound, setNotFound] = React.useState(false);
 
-  const handleLookup = async () => {
-    setNotFound(false);
-    setLookup(null);
-    try {
-      const r = await fetch(`${API}/api/Orders/user/list`, { headers: authHeaders });
-      const list = r.ok ? await r.json() : [];
-      const found = Array.isArray(list) ? list.find((o: any) => String(o.id) === String(orderId).trim()) : null;
-      if (found) setLookup({ id: found.id, statusName: found.statusName, dateCreated: found.dateCreated });
-      else setNotFound(true);
-    } catch { setNotFound(true); }
-  };
+  const handleLookup = React.useCallback(
+    async (forceId?: string | number) => {
+      setNotFound(false);
+      setLookup(null);
+      try {
+        const r = await fetch(`${API}/api/Orders/user/list`, { headers: authHeaders });
+        const list = r.ok ? await r.json() : [];
+        const idToFind = String(
+          (typeof forceId === "string" || typeof forceId === "number") ? forceId : orderId
+        ).trim();
 
-  const TimelineItem = ({ title, subtitle, done, active }:{ title: string; subtitle?: string; done?: boolean; active?: boolean }) => (
+        const found = Array.isArray(list)
+          ? list.find((o: any) => String(o.id) === idToFind)
+          : null;
+
+        if (found) setLookup({ id: found.id, statusName: found.statusName, dateCreated: found.dateCreated });
+        else setNotFound(true);
+      } catch {
+        setNotFound(true);
+      }
+    },
+    [orderId, authHeaders]
+  );
+
+  // Якщо прийшли з URL ?orderId=... — підставляємо і одразу шукаємо
+  React.useEffect(() => {
+    if (initialOrderId) {
+      setOrderId(initialOrderId);
+      handleLookup(initialOrderId);
+    }
+  }, [initialOrderId, handleLookup]);
+
+  const TimelineItem = ({ title, subtitle, done, active }:{
+    title: string; subtitle?: string; done?: boolean; active?: boolean
+  }) => (
     <Box sx={{ pl: 2, borderLeft: "2px solid", borderColor: done ? "success.main" : active ? "primary.main" : "divider", my: 2 }}>
       <Typography sx={{ fontWeight: 600 }}>{title}</Typography>
       {subtitle && <Typography variant="body2" color="text.secondary">{subtitle}</Typography>}
@@ -250,13 +295,20 @@ function Track() {
 
       <Stack spacing={2} sx={{ mb: 2 }}>
         <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
-          <TextField fullWidth label="Номер замовлення" value={orderId} onChange={(e)=>setOrderId(e.target.value)} />
-          <Button variant="contained" onClick={handleLookup}>Відстежувати</Button>
+          <TextField
+            fullWidth
+            label="Номер замовлення"
+            value={orderId}
+            onChange={(e)=>setOrderId(e.target.value)}
+          />
+          <Button variant="contained" onClick={() => handleLookup()}>
+            Відстежувати
+          </Button>
         </Stack>
       </Stack>
 
       <Grid container spacing={2}>
-        {/* Ліва колонка — ПРИКЛАД */}
+        {/* Демонстраційна колонка */}
         <Grid item xs={12} md={6}>
           <Card variant="outlined" sx={{ borderRadius: 3 }}>
             <CardContent>
@@ -274,7 +326,7 @@ function Track() {
           </Card>
         </Grid>
 
-        {/* Права колонка — СТАТУС за введеним № */}
+        {/* Реальний статус */}
         <Grid item xs={12} md={6}>
           <Card variant="outlined" sx={{ borderRadius: 3 }}>
             <CardContent>
